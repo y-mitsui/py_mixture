@@ -2,7 +2,7 @@ from libc.stdlib cimport malloc, free
 
 cdef extern from "bernoulli_mixture.h":
     BernoulliMixture *bernoulliMixtureInit(int n_components, int n_iter)
-    void bernoulliMixtureFit(BernoulliMixture *bernoulli_mixture, double *sample_X, int n_samples, int n_dimentions)
+    void bernoulliMixtureFit(BernoulliMixture *bernoulli_mixture, int **success_dimentions, int *n_success, int n_samples, int n_dimentions)
     ctypedef struct BernoulliMixture:
         int n_components
         double *latent_z
@@ -13,20 +13,23 @@ cdef class BernoulliMixtureWrap:
     def __init__(self, n_components, n_iter):
         self.bernoulli_mixture = bernoulliMixtureInit(n_components, n_iter)
         
-    def fit_transform(self, sample_X):
-        cdef int n_samples = sample_X.shape[0]
-        cdef int n_dimentions = sample_X.shape[1]
-        cdef double *c_sample_X = <double*>malloc(sizeof(double) * n_samples * n_dimentions)
+    def fit_transform(self, success_dimentions, n_dimentions):
+        cdef int n_samples = len(success_dimentions)
+        cdef int **c_success_dimentions = <int**>malloc(sizeof(int*) * n_samples)
+        cdef int *c_n_cusscess = <int*>malloc(sizeof(int) * n_samples)
         for i in range(n_samples):
-            for j in range(n_dimentions):
-                c_sample_X[i * n_dimentions + j] = sample_X[i, j]
+            c_n_cusscess[i] = len(success_dimentions[i])
+            c_success_dimentions[i] = <int*>malloc(sizeof(int) * c_n_cusscess[i])
+            for j in range(c_n_cusscess[i]):
+                c_success_dimentions[i][j] = success_dimentions[i][j]
                 
-        bernoulliMixtureFit(self.bernoulli_mixture, c_sample_X, n_samples, n_dimentions)
+        bernoulliMixtureFit(self.bernoulli_mixture, c_success_dimentions, c_n_cusscess, n_samples, n_dimentions)
         result = []
         for i in range(n_samples):
             row = []
             for j in range(self.bernoulli_mixture.n_components):
                 row.append(self.bernoulli_mixture.latent_z[i * self.bernoulli_mixture.n_components + j])
             result.append(row)
-        free(c_sample_X)
+        free(c_success_dimentions)
+        free(c_n_cusscess)
         return result

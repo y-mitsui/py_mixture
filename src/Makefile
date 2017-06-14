@@ -1,6 +1,6 @@
-CFLAGS=-pg -g -O2 -msse2
+CFLAGS=-v -g -O0 
 LOADLIBES=-lm 
 #CC=gcc-5
 
-multi_bernoulli: 
 test: bernoulli_mixture.o
+multi_bernoulli: 

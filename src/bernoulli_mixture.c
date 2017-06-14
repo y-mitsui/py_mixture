@@ -36,35 +36,44 @@ BernoulliMixture *bernoulliMixtureInit(int n_components, int n_iter) {
 	return bernoulli_mixture;
 }
 
-double logBernoulli(double *sample_X, int n_dimentions, double *log_bernoulli_params) {
+double logBernoulli(int *sample_X0, int *sample_X1, int n_success, int n_dimentions, double *log_bernoulli_params) {
 	double log_prob = 0.0;
-	for(int i=0; i < n_dimentions; i++) {
-		log_prob += sample_X[i] * log_bernoulli_params[i] + (1 - sample_X[i]) * (1 - log_bernoulli_params[i]);
+
+	for(int i=0; i < n_success; i++) {
+		log_prob += log_bernoulli_params[sample_X1[i] * 2 + 1] ;
 	}
+	for(int i=0; i < n_dimentions - n_success; i++) {
+		log_prob += log_bernoulli_params[sample_X0[i] * 2];
+	}
+
 	return log_prob;
 }
 
-inline double min(double x, double y) {
+double dmin(double x, double y) {
 	return (x < y) ? x : y;
 }
 
-inline double max(double x, double y) {
+double dmax(double x, double y) {
 	return (x > y) ? x : y;
 }
 
-void bernoulliEStep(BernoulliMixture *bernoulli_mixture, double *sample_X, int n_samples, int n_dimentions, double *bernoulli_params, double *weights, double *latent_z) {
+void bernoulliEStep(BernoulliMixture *bernoulli_mixture, int n_samples, int n_dimentions, double *bernoulli_params, double *weights, double *latent_z) {
 	double *log_weights = malloc(sizeof(double) * bernoulli_mixture->n_components);
 	for(int i=0; i < bernoulli_mixture->n_components ; i++) {
-		log_weights[i] = log(max(weights[i], 1e-10));
+		log_weights[i] = log(dmax(weights[i], 1e-10));
 	}
-	double *log_bernoulli_params = malloc(sizeof(double) * n_dimentions * bernoulli_mixture->n_components);
-	for(int i=0; i < n_dimentions * bernoulli_mixture->n_components ; i++) {
-		log_bernoulli_params[i] = log(min(max(bernoulli_params[i], 1e-10), 1 - 1e-10));
+	double *log_bernoulli_params = malloc(sizeof(double) * n_dimentions * bernoulli_mixture->n_components * 2);
+	for(int i=0; i < bernoulli_mixture->n_components ; i++) {
+		for(int j=0; j < n_dimentions; j++) {
+			log_bernoulli_params[i * n_dimentions * 2 + j + 1] = log(dmin(dmax(bernoulli_params[i * n_dimentions + j], 1e-10), 1 - 1e-10));
+			log_bernoulli_params[i * n_dimentions * 2 + j] = log(dmin(dmax(1 - bernoulli_params[i * n_dimentions + j], 1e-10), 1 - 1e-10));
+		}
 	}
+
 	float *weight_probs = malloc(sizeof(double) * bernoulli_mixture->n_components);
 	for(int i=0; i < n_samples ; i++) {
 		for(int j=0; j < bernoulli_mixture->n_components; j++) {
-			double bernoulli_prob = logBernoulli(&sample_X[i * n_dimentions], n_dimentions, &log_bernoulli_params[j * n_dimentions]);
+			double bernoulli_prob = logBernoulli(bernoulli_mixture->sample_X0[i], bernoulli_mixture->sample_X1[i], bernoulli_mixture->n_success[i], n_dimentions, &log_bernoulli_params[j * n_dimentions * 2]);
 			weight_probs[j] = (log_weights[j] + bernoulli_prob);
 		}
 
@@ -78,7 +87,7 @@ void bernoulliEStep(BernoulliMixture *bernoulli_mixture, double *sample_X, int n
 	free(weight_probs);
 }
 
-void bernoulliMStep(BernoulliMixture *bernoulli_mixture, double *sample_X, int n_samples, int n_dimentions, double *bernoulli_params, double *weights, double *latent_z) {
+void bernoulliMStep(BernoulliMixture *bernoulli_mixture, int n_samples, int n_dimentions, double *bernoulli_params, double *weights, double *latent_z) {
 	for(int k=0; k < bernoulli_mixture->n_components; k++) {
 		double tot_latent_zk = 0.0;
 		for (int i=0; i < n_samples; i++)
@@ -86,16 +95,61 @@ void bernoulliMStep(BernoulliMixture *bernoulli_mixture, double *sample_X, int n
 
 		for(int d=0; d < n_dimentions; d++) {
 			double tot_mul = 0.0;
-			for (int i=0; i < n_samples; i++)
-				tot_mul += latent_z[i * bernoulli_mixture->n_components + k] * sample_X[i * n_dimentions + d];
-
+			for (int i=0; i < bernoulli_mixture->n_success_dim[d]; i++) {
+				int smaple_idx = bernoulli_mixture->sample_dim1[d][i];
+				tot_mul += latent_z[smaple_idx * bernoulli_mixture->n_components + k];
+			}
 			bernoulli_params[k * n_dimentions + d] = tot_mul / tot_latent_zk;
 			weights[k] = tot_latent_zk / n_samples;
 		}
 	}
 }
 
-void bernoulliMixtureFit(BernoulliMixture *bernoulli_mixture, double *sample_X, int n_samples, int n_dimentions) {
+void bernoulliMixtureFit(BernoulliMixture *bernoulli_mixture, int **success_dimentions, int *n_success, int n_samples, int n_dimentions) {
+	int **sample_X0 = malloc(sizeof(int*) * n_samples);
+	int **sample_X1 = malloc(sizeof(int*) * n_samples);
+
+	for (int i=0; i < n_samples; i++) {
+		sample_X0[i] = malloc(sizeof(int) * (n_dimentions - n_success[i]));
+		sample_X1[i] = malloc(sizeof(int) * n_success[i]);
+
+		int n_0 = 0;
+		int n_1 = 0;
+		for (int j=0; j < n_dimentions; j++) {
+			int k;
+			for(k=0; k < n_success[i]; k++) {
+				if (success_dimentions[i][k] == j) break;
+			}
+			if (k < n_success[i]) {
+				sample_X1[i][n_1++] = j;
+			}else {
+				sample_X0[i][n_0++] = j;
+			}
+		}
+	}
+
+	int **sample_dim1 = malloc(sizeof(int*) * n_dimentions);
+	int *tmp = malloc(sizeof(int) * n_samples);
+	int *n_success_dim = calloc(1, sizeof(int) * n_dimentions);
+	for (int j=0; j < n_dimentions; j++) {
+		for (int i=0; i < n_samples; i++) {
+			int k;
+			for(k=0; k < n_success[i]; k++) {
+				if (success_dimentions[i][k] == j) break;
+			}
+			if (k < n_success[i]) {
+				tmp[n_success_dim[j]++] = i;
+			}
+		}
+		sample_dim1[j] = malloc(sizeof(int) * n_success_dim[j]);
+		memcpy(sample_dim1[j], tmp, sizeof(int) * n_success_dim[j]);
+	}
+	bernoulli_mixture->sample_dim1 = sample_dim1;
+	bernoulli_mixture->n_success_dim = n_success_dim;
+
+	bernoulli_mixture->sample_X0 = sample_X0;
+	bernoulli_mixture->sample_X1 = sample_X1;
+	bernoulli_mixture->n_success = n_success;
 	double *bernoulli_params = malloc(sizeof(double) * bernoulli_mixture->n_components * n_dimentions);
 	for (int i=0; i < bernoulli_mixture->n_components * n_dimentions; i++) {
 		bernoulli_params[i] = xor128();
@@ -111,9 +165,10 @@ void bernoulliMixtureFit(BernoulliMixture *bernoulli_mixture, double *sample_X, 
 		weights[i] /= tot_weights;
 
 	for(int iter=0; iter < bernoulli_mixture->n_iter; iter++) {
-		bernoulliEStep(bernoulli_mixture, sample_X, n_samples, n_dimentions, bernoulli_params, weights, latent_z);
-		bernoulliMStep(bernoulli_mixture, sample_X, n_samples, n_dimentions, bernoulli_params, weights, latent_z);
-		if (iter % (bernoulli_mixture->n_iter / 100 + 1) == 0) {
+		bernoulliEStep(bernoulli_mixture, n_samples, n_dimentions, bernoulli_params, weights, latent_z);
+		bernoulliMStep(bernoulli_mixture, n_samples, n_dimentions, bernoulli_params, weights, latent_z);
+		//if (iter % (bernoulli_mixture->n_iter / 100 + 1) == 0) {
+		if (iter % 1 == 0) {
 			printf("%d / %d\n", iter, bernoulli_mixture->n_iter);
 		}
 	}
