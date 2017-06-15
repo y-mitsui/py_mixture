@@ -5,13 +5,31 @@ cdef extern from "bernoulli_mixture.h":
     void bernoulliMixtureFit(BernoulliMixture *bernoulli_mixture, int **success_dimentions, int *n_success, int n_samples, int n_dimentions)
     ctypedef struct BernoulliMixture:
         int n_components
+        int n_dimentions
         double *latent_z
+        double *bernoulli_params
+        double *weights
     
 cdef class BernoulliMixtureWrap:
     cdef BernoulliMixture *bernoulli_mixture
     
     def __init__(self, n_components, n_iter):
         self.bernoulli_mixture = bernoulliMixtureInit(n_components, n_iter)
+        
+    def getMeans(self):
+        r = []
+        for i in range(self.bernoulli_mixture.n_components):
+            row = []
+            for j in range(self.bernoulli_mixture.n_dimentions):
+                row.append(self.bernoulli_mixture.bernoulli_params[i * self.bernoulli_mixture.n_dimentions + j])
+            r.append(row)
+        return r
+    
+    def getWeights(self):
+        r = []
+        for i in range(self.bernoulli_mixture.n_components):
+            r.append(self.bernoulli_mixture.weights[i])
+        return r
         
     def fit_transform(self, success_dimentions, n_dimentions):
         cdef int n_samples = len(success_dimentions)

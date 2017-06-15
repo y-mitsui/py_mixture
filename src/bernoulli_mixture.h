@@ -3,7 +3,7 @@ typedef struct {
 	int n_components;
 	int n_dimentions;
 	double *weights;
-	double *means;
+	double *bernoulli_params;
 	double *c_sample_X;
 	double *latent_z;
 	int n_iter;
