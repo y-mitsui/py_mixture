@@ -11,7 +11,7 @@ if __name__ == "__main__":
     n_dim = 2
     n_components = 2
     
-    np.random.seed(123)
+    np.random.seed(1234)
     weights = np.random.dirichlet([1] * 2)
     ber_params = np.random.uniform(1e-3, 1 - 1e-3, size=(n_components, n_dim))
     latent_z = np.random.multinomial(1, weights, size=n_sample)

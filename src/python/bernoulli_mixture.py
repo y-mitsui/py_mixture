@@ -60,19 +60,22 @@ class BernoulliMixture:
         
 if __name__ == "__main__":
     #import matplotlib.pyplot as plt
-    n_sample = 10
-    n_dim = 20
-    n_components = 200
+    n_sample = 20
+    n_dim = 2
+    n_components = 2
     
     weights = np.random.dirichlet([1] * 2)
     ber_params = np.random.uniform(1e-3, 1 - 1e-3, size=(n_components, n_dim))
+    print "ber_params", ber_params
     latent_z = np.random.multinomial(1, weights, size=n_sample)
     sample_X = []
     for z in latent_z:
+        print np.where(z==1)[0][0]
         X = np.random.binomial(1, ber_params[np.where(z==1)[0][0]])
         sample_X.append(X)
     #plt.hist(sample_X)
     #plt.show()
     sample_X = np.array(sample_X)
-    poisson_mixture = BernoulliMixture(n_components)
-    print poisson_mixture.fit(sample_X)
+    poisson_mixture = BernoulliMixture(n_components, 100)
+    poisson_mixture.fit(sample_X)
+    print poisson_mixture.poi_params

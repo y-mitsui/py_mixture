@@ -182,12 +182,12 @@ void bernoulliMixtureFit(BernoulliMixture *bernoulli_mixture, int **success_dime
 		/*if (iter % 1 == 0) {
 			printf("%d / %d\n", iter, bernoulli_mixture->n_iter);
 		}*/
-		/*for(int i=0; i < bernoulli_mixture->n_components; i++) {
+		for(int i=0; i < bernoulli_mixture->n_components; i++) {
 			for(int j=0; j < n_dimentions; j++) {
 				printf("%.3f ", bernoulli_params[i * n_dimentions + j]);
 			}
 			puts("");
-		}*/
+		}
 	}
 
 	bernoulli_mixture->latent_z = latent_z;

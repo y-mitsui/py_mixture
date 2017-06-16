@@ -24,8 +24,6 @@ class PoissonMixture:
         for _ in range(self.n_iter):
             self.eStep()
             self.mStep()
-            print self.weights
-            print self.poi_params
         return self.latent_z
     
     def log_poisson(self, X, parameter):
@@ -62,7 +60,7 @@ class PoissonMixture:
         
 if __name__ == "__main__":
     #import matplotlib.pyplot as plt
-    n_sample = 200000
+    n_sample = 200
     n_components = 2
     weights = (0.7, 0.3)
     poi_params = (0.5, 5)
@@ -76,3 +74,4 @@ if __name__ == "__main__":
     sample_X = np.array(sample_X).reshape(-1, 1) 
     poisson_mixture = PoissonMixture(n_components)
     poisson_mixture.fit(sample_X)
+    print poisson_mixture.poi_params
