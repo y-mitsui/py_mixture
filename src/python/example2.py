@@ -16,7 +16,6 @@ mnist["data"][zero_index] = 0
 mnist["data"][np.logical_not(zero_index)] = 1
 target_index = np.logical_or(np.logical_or(mnist["target"] == 2, mnist["target"] == 3), mnist["target"] == 4)
 data = mnist["data"][target_index]
-data = mnist["data"]
 np.random.shuffle(data)
 print "data.shape", data.shape
 #data = data[:1000]

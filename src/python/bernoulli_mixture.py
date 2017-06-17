@@ -28,7 +28,7 @@ class BernoulliMixture:
     
     def log_bernoulli(self, X, parameter):
         np.clip(parameter, 1e-10, 1 - 1e-10, out=parameter)
-        pdf = X * np.log(parameter) + (1 - X) * (1 - np.log(parameter))
+        pdf = X * np.log(parameter) + (1 - X) * np.log((1 - parameter))
         return pdf.sum()
      
     def eStep(self):
