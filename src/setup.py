@@ -7,7 +7,7 @@ import os
 
 ext1 = Extension("bernoulli_mixture_wrap",
                  extra_compile_args=["-g"],
-                sources=["bernoulli_mixture_wrap.pyx", "bernoulli_mixture.c", "lib/logsumexp.c"],
+                sources=["bernoulli_mixture_wrap.pyx", "bernoulli_mixture.c"],
                 )
                 
 setup(name = 'bernoulli_mixture', ext_modules = cythonize([ext1]))
