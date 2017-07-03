@@ -79,6 +79,7 @@ void bernoulliEStep(BernoulliMixture *bernoulli_mixture, double *sample_X, int n
 		log_bernoulli_params0[i] = log(min(max(1 - bernoulli_params[i], 1e-10), 1 - 1e-10));
 	}
 	double *weight_probs = malloc(sizeof(double) * bernoulli_mixture->n_components);
+	double loglikelyfood = 0.0;
 	for(int i=0; i < n_samples ; i++) {
 		for(int j=0; j < bernoulli_mixture->n_components; j++) {
 			double bernoulli_prob0 = logBernoulli2(bernoulli_mixture->sample_X0[i],
@@ -92,10 +93,12 @@ void bernoulliEStep(BernoulliMixture *bernoulli_mixture, double *sample_X, int n
 		}
 
 		double tot_log_likelyhood = logsumexp(weight_probs, bernoulli_mixture->n_components);
+		loglikelyfood += tot_log_likelyhood;
 		for(int j=0; j < bernoulli_mixture->n_components; j++) {
 			latent_z[i * bernoulli_mixture->n_components + j] = exp(weight_probs[j] - tot_log_likelyhood);
 		}
 	}
+	printf("loglikelyfood:%f\n", loglikelyfood);
 	free(log_bernoulli_params0);
 	free(log_bernoulli_params1);
 	free(log_weights);
@@ -172,7 +175,6 @@ void bernoulliMixtureFit(BernoulliMixture *bernoulli_mixture, double *sample_X, 
         memcpy(bernoulli_mixture->sample_X1_dim[j], tmp1_dim, sizeof(int) * n_success_row);
     }
     
-    puts("a");
 	for(int iter=0; iter < bernoulli_mixture->n_iter; iter++) {
 		bernoulliEStep(bernoulli_mixture, sample_X, n_samples, n_dimentions, bernoulli_params, weights, latent_z);
 		bernoulliMStep(bernoulli_mixture, sample_X, n_samples, n_dimentions, bernoulli_params, weights, latent_z);
