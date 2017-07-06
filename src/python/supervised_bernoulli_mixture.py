@@ -12,6 +12,7 @@ class SupervisedBernoulliMixture:
     def __init__(self, n_components=2, n_iter=100):
         self.n_components = n_components
         self.n_iter = n_iter
+        self.n_flag = 0
     
     def fit(self, sample_X, sample_y):
         self.sample_X = sample_X
@@ -55,19 +56,33 @@ class SupervisedBernoulliMixture:
             
             new_z.append(z)
         self.latent_z = np.exp(np.array(new_z))
-        print "self.latent_z", self.latent_z.shape
     
     def gradient(self, theta, *args):
+        s_params = theta.reshape(self.supervived_params.shape[0], self.supervived_params.shape[1])
         r = []
         for i in range(self.n_class):
             target_idx = self.sample_y == i
-            tmp = np.exp(np.dot(self.supervived_params[i], self.latent_z[target_idx].T)) * self.latent_z[target_idx].T
+            #print "np.dot(s_params[i], self.latent_z[target_idx].T)", np.dot(s_params[i], self.latent_z[target_idx].T)
+            tmp = np.exp(np.dot(s_params[i], self.latent_z[target_idx].T)) * self.latent_z[target_idx].T
+            print "tmp", tmp
             val = np.sum(self.latent_z[target_idx] - 1 / self.slack_params[target_idx].reshape(-1, 1) * tmp.T, 0)
             r.append(val)
+        #print np.array(r)
+        #print ""
+        if self.n_flag > 5:
+            sys.exit(1)
+        self.n_flag += 1
         return np.array(r).flatten()
         
     def J(self, theta, *args):
-        return 0
+        s_params = theta.reshape(self.supervived_params.shape[0], self.supervived_params.shape[1])
+        r = 0.0
+        for d in range(self.sample_y.shape[0]):
+            tmp = np.sum(np.exp(np.dot(s_params, self.latent_z[d])))
+            tmp2 = np.dot(s_params[int(self.sample_y[d])], self.latent_z[d])
+            r += tmp2 - 1 / self.slack_params[d] * tmp - np.log(self.slack_params[d]) + 1
+        #print "r", r
+        return r
     
     def mStep(self):
         new_poi_params = []
@@ -79,9 +94,13 @@ class SupervisedBernoulliMixture:
             new_poi_params.append(row_poi_params)
             self.weights[k] = tot_latent_z / self.sample_X.shape[0]
         self.poi_params = np.array(new_poi_params)
+        
         init_theta = self.supervived_params.flatten()
         best_params = optimize.fmin_cg(self.J, init_theta, fprime=self.gradient)
+        print best_params
+        sys.exit(1)
         self.supervived_params = best_params.reshape(self.supervived_params.shape[0], self.supervived_params.shape[1])
+        
         for d in range(self.slack_params.shape[0]):
             self.slack_params[d] = np.sum(np.exp(np.dot(self.supervived_params, self.latent_z[d])))
             
