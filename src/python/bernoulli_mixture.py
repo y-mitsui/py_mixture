@@ -62,7 +62,7 @@ if __name__ == "__main__":
     #import matplotlib.pyplot as plt
     n_sample = 20
     n_dim = 2
-    n_components = 2
+    n_components = 10
     
     weights = np.random.dirichlet([1] * 2)
     ber_params = np.random.uniform(1e-3, 1 - 1e-3, size=(n_components, n_dim))

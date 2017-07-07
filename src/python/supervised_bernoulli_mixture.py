@@ -6,6 +6,7 @@ import numpy as np
 from scipy.misc import logsumexp
 import sys
 from scipy import optimize
+import warnings
 
 class SupervisedBernoulliMixture:
     
@@ -40,6 +41,7 @@ class SupervisedBernoulliMixture:
     def eStep(self):
         new_z = []
         log_weights = np.log(self.weights)
+        loglikelyhood = 0.0;
         for d in range(self.sample_X.shape[0]):
             X = self.sample_X[d]
             weights_probs = []
@@ -50,11 +52,13 @@ class SupervisedBernoulliMixture:
                 c = self.supervived_params[int(self.sample_y[d]), k] - 1 / self.slack_params[d] * components_sum
                 weights_probs.append(a + b + c)
             tot_log_likelyhood = logsumexp(weights_probs)
+            loglikelyhood += tot_log_likelyhood
             z = []
             for wp in weights_probs:
                 z.append(wp - tot_log_likelyhood)
             
             new_z.append(z)
+        print "loglikelyhood", loglikelyhood
         self.latent_z = np.exp(np.array(new_z))
     
     def gradient(self, theta, *args):
@@ -64,15 +68,12 @@ class SupervisedBernoulliMixture:
             target_idx = self.sample_y == i
             #print "np.dot(s_params[i], self.latent_z[target_idx].T)", np.dot(s_params[i], self.latent_z[target_idx].T)
             tmp = np.exp(np.dot(s_params[i], self.latent_z[target_idx].T)) * self.latent_z[target_idx].T
-            print "tmp", tmp
             val = np.sum(self.latent_z[target_idx] - 1 / self.slack_params[target_idx].reshape(-1, 1) * tmp.T, 0)
             r.append(val)
         #print np.array(r)
         #print ""
-        if self.n_flag > 5:
-            sys.exit(1)
         self.n_flag += 1
-        return np.array(r).flatten()
+        return -np.array(r).flatten()
         
     def J(self, theta, *args):
         s_params = theta.reshape(self.supervived_params.shape[0], self.supervived_params.shape[1])
@@ -81,8 +82,14 @@ class SupervisedBernoulliMixture:
             tmp = np.sum(np.exp(np.dot(s_params, self.latent_z[d])))
             tmp2 = np.dot(s_params[int(self.sample_y[d])], self.latent_z[d])
             r += tmp2 - 1 / self.slack_params[d] * tmp - np.log(self.slack_params[d]) + 1
+            
+        if r == float('inf') or r == float('-inf') or r != r:
+            print s_params
+            print self.latent_z[d]
+            print np.dot(s_params, self.latent_z[d])
+            sys.exit(1)
         #print "r", r
-        return r
+        return -r
     
     def mStep(self):
         new_poi_params = []
@@ -96,13 +103,24 @@ class SupervisedBernoulliMixture:
         self.poi_params = np.array(new_poi_params)
         
         init_theta = self.supervived_params.flatten()
-        best_params = optimize.fmin_cg(self.J, init_theta, fprime=self.gradient)
-        print best_params
-        sys.exit(1)
-        self.supervived_params = best_params.reshape(self.supervived_params.shape[0], self.supervived_params.shape[1])
-        
+        min_max = [(-20, 20)] * init_theta.shape[0]
+        #best_params = optimize.fmin_cg(self.J, init_theta, fprime=self.gradient, gtol=1e-5)
+        best_params = optimize.minimize(self.J, init_theta, tol=1e-5, method='L-BFGS-B', options={"maxiter":5}, bounds=min_max, jac=self.gradient)
+        print "best_params.fun", best_params.fun, best_params.nit
+        #best_params = optimize.differential_evolution(self.J, min_max, maxiter=100)
+        #print "best_params.fun", best_params.fun, best_params.nit
+        self.supervived_params = best_params.x.reshape(self.supervived_params.shape[0], self.supervived_params.shape[1])
+        self.score(self.latent_z, self.sample_y)
         for d in range(self.slack_params.shape[0]):
             self.slack_params[d] = np.sum(np.exp(np.dot(self.supervived_params, self.latent_z[d])))
-            
-            
+    
+    
+    def score(self, sample_X, sample_y):
+        result = []
+        for i in range(self.n_class):
+            result.append(np.dot(sample_X, self.supervived_params[:, i]) / np.sum(np.dot(sample_X, self.supervived_params.T), 1))
+        diff = sample_y - np.argmax(np.array(result), 0)
+        print float(diff[diff==0].shape[0]) / diff.shape[0]
+    
+    
         
