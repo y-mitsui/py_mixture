@@ -28,9 +28,10 @@ class SupervisedBernoulliMixture:
         self.supervived_params = np.random.rand(self.n_class, self.n_components)
         self.slack_params = np.random.rand(n_samples)
         
-        for _ in range(self.n_iter):
+        for i in range(self.n_iter):
             self.eStep()
             self.mStep()
+            print "%d / %d"%(i, self.n_iter) 
         return self.latent_z
     
     def log_bernoulli(self, X, parameter):
@@ -51,7 +52,7 @@ class SupervisedBernoulliMixture:
                 #components_sum = np.sum(np.exp(np.dot(self.supervived_params, self.latent_z[d].reshape(-1, 1))) * self.supervived_params[:, k].reshape(-1, 1))
                 components_sum = np.sum(np.exp(self.supervived_params[:, k]))
                 c = self.supervived_params[int(self.sample_y[d]), k] - 1 / self.slack_params[d] * components_sum
-                weights_probs.append(a + b + c)
+                weights_probs.append(a + b + 0.0 * c)
             tot_log_likelyhood = logsumexp(weights_probs)
             loglikelyhood += tot_log_likelyhood
             z = []
@@ -108,11 +109,11 @@ class SupervisedBernoulliMixture:
         init_theta = np.random.rand(self.supervived_params.shape[0] * self.supervived_params.shape[1])
         min_max = [(-15, 15)] * init_theta.shape[0]
         #best_params = optimize.fmin_cg(self.J, init_theta, fprime=self.gradient, gtol=1e-5)
-        
         #best_params = optimize.minimize(self.J, init_theta, tol=1e-4, method='L-BFGS-B', options={"maxiter":20}, bounds=min_max, jac=self.gradient)
         #print "best_params.fun", best_params.fun, best_params.nit
         best_params = optimize.minimize(self.J, init_theta, tol=1e-3, method='SLSQP', options={"maxiter":30}, bounds=min_max, jac=self.gradient)
-        print "best_params.fun", best_params.fun, best_params.nit
+        #best_params = optimize.minimize(self.J, init_theta, tol=1e-3, method='CG', options={"maxiter":150}, jac=self.gradient)
+        #print "best_params.fun", best_params.fun, best_params.nit
         #best_params = optimize.differential_evolution(self.J, min_max, maxiter=50)
         #print "best_params.fun", best_params.fun, best_params.nit
         self.supervived_params = best_params.x.reshape(self.supervived_params.shape[0], self.supervived_params.shape[1])
