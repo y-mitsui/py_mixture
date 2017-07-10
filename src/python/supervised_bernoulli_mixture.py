@@ -48,7 +48,8 @@ class SupervisedBernoulliMixture:
             for k in range(self.n_components):
                 a = log_weights[k]
                 b = self.log_bernoulli(X, self.poi_params[k])
-                components_sum = np.sum(np.exp(np.dot(self.supervived_params, self.latent_z[d])) * self.supervived_params[:, k])
+                #components_sum = np.sum(np.exp(np.dot(self.supervived_params, self.latent_z[d].reshape(-1, 1))) * self.supervived_params[:, k].reshape(-1, 1))
+                components_sum = np.sum(np.exp(self.supervived_params[:, k]))
                 c = self.supervived_params[int(self.sample_y[d]), k] - 1 / self.slack_params[d] * components_sum
                 weights_probs.append(a + b + c)
             tot_log_likelyhood = logsumexp(weights_probs)
@@ -67,8 +68,9 @@ class SupervisedBernoulliMixture:
         for i in range(self.n_class):
             target_idx = self.sample_y == i
             #print "np.dot(s_params[i], self.latent_z[target_idx].T)", np.dot(s_params[i], self.latent_z[target_idx].T)
-            tmp = np.exp(np.dot(s_params[i], self.latent_z[target_idx].T)) * self.latent_z[target_idx].T
-            val = np.sum(self.latent_z[target_idx] - 1 / self.slack_params[target_idx].reshape(-1, 1) * tmp.T, 0)
+            #tmp = np.exp(np.dot(s_params[i], self.latent_z[target_idx].T)).reshape(1, -1) * self.latent_z[target_idx].T
+            tmp = self.latent_z[target_idx] * np.exp(s_params[i, :]).reshape(1, -1)
+            val = np.sum(self.latent_z[target_idx] - 1 / self.slack_params[target_idx].reshape(-1, 1) * tmp, 0)
             r.append(val)
         #print np.array(r)
         #print ""
@@ -79,9 +81,10 @@ class SupervisedBernoulliMixture:
         s_params = theta.reshape(self.supervived_params.shape[0], self.supervived_params.shape[1])
         r = 0.0
         for d in range(self.sample_y.shape[0]):
-            tmp = np.sum(np.exp(np.dot(s_params, self.latent_z[d])))
+            tmp = np.sum(np.exp(np.dot(s_params, self.latent_z[d].reshape(-1, 1))))
+            tmp3 = np.sum(self.latent_z[d] * tmp)
             tmp2 = np.dot(s_params[int(self.sample_y[d])], self.latent_z[d])
-            r += tmp2 - 1 / self.slack_params[d] * tmp - np.log(self.slack_params[d]) + 1
+            r += tmp2 - 1 / self.slack_params[d] * tmp3 - np.log(self.slack_params[d]) + 1
             
         if r == float('inf') or r == float('-inf') or r != r:
             print s_params
@@ -102,23 +105,31 @@ class SupervisedBernoulliMixture:
             self.weights[k] = tot_latent_z / self.sample_X.shape[0]
         self.poi_params = np.array(new_poi_params)
         
-        init_theta = self.supervived_params.flatten()
-        min_max = [(-20, 20)] * init_theta.shape[0]
+        init_theta = np.random.rand(self.supervived_params.shape[0] * self.supervived_params.shape[1])
+        min_max = [(-15, 15)] * init_theta.shape[0]
         #best_params = optimize.fmin_cg(self.J, init_theta, fprime=self.gradient, gtol=1e-5)
-        best_params = optimize.minimize(self.J, init_theta, tol=1e-5, method='L-BFGS-B', options={"maxiter":5}, bounds=min_max, jac=self.gradient)
+        
+        #best_params = optimize.minimize(self.J, init_theta, tol=1e-4, method='L-BFGS-B', options={"maxiter":20}, bounds=min_max, jac=self.gradient)
+        #print "best_params.fun", best_params.fun, best_params.nit
+        best_params = optimize.minimize(self.J, init_theta, tol=1e-3, method='SLSQP', options={"maxiter":30}, bounds=min_max, jac=self.gradient)
         print "best_params.fun", best_params.fun, best_params.nit
-        #best_params = optimize.differential_evolution(self.J, min_max, maxiter=100)
+        #best_params = optimize.differential_evolution(self.J, min_max, maxiter=50)
         #print "best_params.fun", best_params.fun, best_params.nit
         self.supervived_params = best_params.x.reshape(self.supervived_params.shape[0], self.supervived_params.shape[1])
         self.score(self.latent_z, self.sample_y)
         for d in range(self.slack_params.shape[0]):
-            self.slack_params[d] = np.sum(np.exp(np.dot(self.supervived_params, self.latent_z[d])))
+            #self.slack_params[d] = np.sum(np.exp(np.dot(self.supervived_params, self.latent_z[d])))
+            components_sum = np.sum(np.exp(np.dot(self.supervived_params, self.latent_z[d].reshape(-1, 1) )))
+            self.slack_params[d] = np.sum(self.latent_z[d] * components_sum)
     
     
     def score(self, sample_X, sample_y):
+        #print self.supervived_params
         result = []
         for i in range(self.n_class):
-            result.append(np.dot(sample_X, self.supervived_params[:, i]) / np.sum(np.dot(sample_X, self.supervived_params.T), 1))
+            a = np.dot(self.supervived_params[i, :].reshape(1, -1), sample_X.T).flatten()
+            b = np.sum(np.dot(self.supervived_params, sample_X.T), 0)
+            result.append(a / b)
         diff = sample_y - np.argmax(np.array(result), 0)
         print float(diff[diff==0].shape[0]) / diff.shape[0]
     
