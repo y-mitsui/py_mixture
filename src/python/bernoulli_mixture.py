@@ -21,9 +21,10 @@ class BernoulliMixture:
         self.weights = np.random.rand(self.n_components)
         self.weights /= self.weights.sum()
         
-        for _ in range(self.n_iter):
+        for i in range(self.n_iter):
             self.eStep()
             self.mStep()
+            print "%d / %d"%(i, self.n_iter)
         return self.latent_z
     
     def log_bernoulli(self, X, parameter):
@@ -62,7 +63,7 @@ if __name__ == "__main__":
     #import matplotlib.pyplot as plt
     n_sample = 20
     n_dim = 2
-    n_components = 10
+    n_components = 2
     
     weights = np.random.dirichlet([1] * 2)
     ber_params = np.random.uniform(1e-3, 1 - 1e-3, size=(n_components, n_dim))
@@ -76,6 +77,6 @@ if __name__ == "__main__":
     #plt.hist(sample_X)
     #plt.show()
     sample_X = np.array(sample_X)
-    poisson_mixture = BernoulliMixture(n_components, 100)
+    poisson_mixture = BernoulliMixture(n_components, 3)
     poisson_mixture.fit(sample_X)
     print poisson_mixture.poi_params

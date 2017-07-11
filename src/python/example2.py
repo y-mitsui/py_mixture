@@ -15,16 +15,23 @@ mnist = fetch_mldata('MNIST original', data_home=".")
 zero_index = mnist["data"] <= 128
 mnist["data"][zero_index] = 0
 mnist["data"][np.logical_not(zero_index)] = 1
-target_index = np.logical_or(np.logical_or(mnist["target"] == 2, mnist["target"] == 3), mnist["target"] == 4)
+
+target_index = None
+for target in range(0, 10):
+    if target_index == None:
+        target_index = mnist["target"] == target
+    else:
+        target_index = np.logical_or(target_index, mnist["target"] == target)
+
 #data = mnist["data"][target_index]
-shuffle_idx = range(mnist["data"].shape[0])
+shuffle_idx = range(mnist["data"][target_index].shape[0])
 np.random.shuffle(shuffle_idx)
-data = mnist["data"][shuffle_idx[:5000]]
-target = mnist["target"][shuffle_idx[:5000]]
+data = mnist["data"][target_index][shuffle_idx[:100]]
+target = mnist["target"][target_index][shuffle_idx[:100]]
 print "data.shape", data.shape
 #data = data[:1000]
 
-poisson_mixture = BernoulliMixture(n_components, 100)
+poisson_mixture = BernoulliMixture(n_components, 20)
 sample_X = poisson_mixture.fit(data)
 print poisson_mixture.poi_params
 print "finish"

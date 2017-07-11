@@ -7,7 +7,7 @@ from scipy.misc import logsumexp
 import sys
 from scipy import optimize
 import warnings
-
+import pandas as pd
 class SupervisedBernoulliMixture:
     
     def __init__(self, n_components=2, n_iter=100):
@@ -52,7 +52,7 @@ class SupervisedBernoulliMixture:
                 #components_sum = np.sum(np.exp(np.dot(self.supervived_params, self.latent_z[d].reshape(-1, 1))) * self.supervived_params[:, k].reshape(-1, 1))
                 components_sum = np.sum(np.exp(self.supervived_params[:, k]))
                 c = self.supervived_params[int(self.sample_y[d]), k] - 1 / self.slack_params[d] * components_sum
-                weights_probs.append(a + b + 0.0 * c)
+                weights_probs.append(a + b + c)
             tot_log_likelyhood = logsumexp(weights_probs)
             loglikelyhood += tot_log_likelyhood
             z = []
@@ -80,9 +80,10 @@ class SupervisedBernoulliMixture:
         
     def J(self, theta, *args):
         s_params = theta.reshape(self.supervived_params.shape[0], self.supervived_params.shape[1])
+        sample_X = pd.get_dummies(np.argmax(self.latent_z, 1)).as_matrix()
         r = 0.0
         for d in range(self.sample_y.shape[0]):
-            tmp = np.sum(np.exp(np.dot(s_params, self.latent_z[d].reshape(-1, 1))))
+            tmp = np.sum(np.exp(np.dot(s_params, sample_X[d].reshape(-1, 1))))
             tmp3 = np.sum(self.latent_z[d] * tmp)
             tmp2 = np.dot(s_params[int(self.sample_y[d])], self.latent_z[d])
             r += tmp2 - 1 / self.slack_params[d] * tmp3 - np.log(self.slack_params[d]) + 1
@@ -106,33 +107,35 @@ class SupervisedBernoulliMixture:
             self.weights[k] = tot_latent_z / self.sample_X.shape[0]
         self.poi_params = np.array(new_poi_params)
         
-        init_theta = np.random.rand(self.supervived_params.shape[0] * self.supervived_params.shape[1])
+        #init_theta = np.random.normal(size=self.supervived_params.shape).flatten() * 2
+        init_theta = self.supervived_params.flatten()
         min_max = [(-15, 15)] * init_theta.shape[0]
         #best_params = optimize.fmin_cg(self.J, init_theta, fprime=self.gradient, gtol=1e-5)
         #best_params = optimize.minimize(self.J, init_theta, tol=1e-4, method='L-BFGS-B', options={"maxiter":20}, bounds=min_max, jac=self.gradient)
         #print "best_params.fun", best_params.fun, best_params.nit
-        best_params = optimize.minimize(self.J, init_theta, tol=1e-3, method='SLSQP', options={"maxiter":30}, bounds=min_max, jac=self.gradient)
-        #best_params = optimize.minimize(self.J, init_theta, tol=1e-3, method='CG', options={"maxiter":150}, jac=self.gradient)
-        #print "best_params.fun", best_params.fun, best_params.nit
+        #best_params = optimize.minimize(self.J, init_theta, tol=3e-4, method='SLSQP', options={"maxiter":200}, bounds=min_max, jac=self.gradient)
+        best_params = optimize.minimize(self.J, init_theta, tol=1e-4, method='CG', options={"maxiter":150}, jac=self.gradient)
         #best_params = optimize.differential_evolution(self.J, min_max, maxiter=50)
-        #print "best_params.fun", best_params.fun, best_params.nit
+        print "best_params.fun", best_params.fun, best_params.nit
         self.supervived_params = best_params.x.reshape(self.supervived_params.shape[0], self.supervived_params.shape[1])
         self.score(self.latent_z, self.sample_y)
+        sample_X = pd.get_dummies(np.argmax(self.latent_z, 1)).as_matrix()
         for d in range(self.slack_params.shape[0]):
             #self.slack_params[d] = np.sum(np.exp(np.dot(self.supervived_params, self.latent_z[d])))
-            components_sum = np.sum(np.exp(np.dot(self.supervived_params, self.latent_z[d].reshape(-1, 1) )))
+            components_sum = np.sum(np.exp(np.dot(self.supervived_params, sample_X[d].reshape(-1, 1) )))
             self.slack_params[d] = np.sum(self.latent_z[d] * components_sum)
     
     
     def score(self, sample_X, sample_y):
-        #print self.supervived_params
+        sample_X = pd.get_dummies(np.argmax(sample_X, 1)).as_matrix()
         result = []
+        b = np.sum(np.exp(np.dot(self.supervived_params, sample_X.T)), 0)
         for i in range(self.n_class):
-            a = np.dot(self.supervived_params[i, :].reshape(1, -1), sample_X.T).flatten()
-            b = np.sum(np.dot(self.supervived_params, sample_X.T), 0)
+            a = np.exp(np.dot(self.supervived_params[i, :].reshape(1, -1), sample_X.T)).flatten()
             result.append(a / b)
+        print np.argmax(np.array(result), 0)[:200]
         diff = sample_y - np.argmax(np.array(result), 0)
-        print float(diff[diff==0].shape[0]) / diff.shape[0]
+        print float(diff[diff==0].shape[0]) / diff.shape[0], diff.shape[0]
     
     
         
