@@ -15,7 +15,7 @@ class SupervisedBernoulliMixture:
         self.n_iter = n_iter
         self.n_flag = 0
     
-    def fit(self, sample_X, sample_y):
+    def fit_transform(self, sample_X, sample_y):
         self.sample_X = sample_X
         self.sample_y = sample_y
         self.n_class = int(np.max(sample_y)) + 1
@@ -107,15 +107,15 @@ class SupervisedBernoulliMixture:
             self.weights[k] = tot_latent_z / self.sample_X.shape[0]
         self.poi_params = np.array(new_poi_params)
         
-        #init_theta = np.random.normal(size=self.supervived_params.shape).flatten() * 2
-        init_theta = self.supervived_params.flatten()
+        init_theta = np.random.normal(size=self.supervived_params.shape).flatten() * 2
+        #init_theta = self.supervived_params.flatten()
         min_max = [(-15, 15)] * init_theta.shape[0]
         #best_params = optimize.fmin_cg(self.J, init_theta, fprime=self.gradient, gtol=1e-5)
         #best_params = optimize.minimize(self.J, init_theta, tol=1e-4, method='L-BFGS-B', options={"maxiter":20}, bounds=min_max, jac=self.gradient)
         #print "best_params.fun", best_params.fun, best_params.nit
-        #best_params = optimize.minimize(self.J, init_theta, tol=3e-4, method='SLSQP', options={"maxiter":200}, bounds=min_max, jac=self.gradient)
-        best_params = optimize.minimize(self.J, init_theta, tol=1e-4, method='CG', options={"maxiter":150}, jac=self.gradient)
-        #best_params = optimize.differential_evolution(self.J, min_max, maxiter=50)
+        #best_params = optimize.minimize(self.J, init_theta, tol=3e-4, method='SLSQP', options={"maxiter":100}, bounds=min_max, jac=self.gradient)
+        #best_params = optimize.minimize(self.J, init_theta, tol=1e-4, method='CG', options={"maxiter":150}, jac=self.gradient)
+        best_params = optimize.differential_evolution(self.J, min_max, maxiter=50)
         print "best_params.fun", best_params.fun, best_params.nit
         self.supervived_params = best_params.x.reshape(self.supervived_params.shape[0], self.supervived_params.shape[1])
         self.score(self.latent_z, self.sample_y)
