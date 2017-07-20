@@ -6,11 +6,14 @@ import numpy as np
 from scipy.misc import logsumexp
 import sys
 from scipy.stats import norm
+from sklearn.cluster import KMeans
+
 class BernoulliNormalMixture:
     
-    def __init__(self, n_components=2, n_iter=100):
+    def __init__(self, n_components=2, n_iter=100, init_kmeans=False):
         self.n_components = n_components
         self.n_iter = n_iter
+        self.init_kmeans = init_kmeans
     
     def fit(self, sample_bernoulli, sample_normal):
         self.sample_bernoulli = sample_bernoulli
@@ -19,8 +22,15 @@ class BernoulliNormalMixture:
         n_dimentions_bernoulli = sample_bernoulli.shape[1]
         n_dimentions_normal = sample_normal.shape[1]
         self.bernoulli_params = np.random.rand(self.n_components, n_dimentions_bernoulli)
-        self.normal_means = np.random.randn(self.n_components, n_dimentions_normal) * 10
-        self.normal_sigmas = np.random.rand(self.n_components, n_dimentions_normal) * 10 + 1
+        
+        if self.init_kmeans:
+            k_means = KMeans(self.n_components)
+            k_means.fit(sample_normal)
+            self.normal_means = k_means.cluster_centers_
+        else:
+            self.normal_means = np.random.randn(self.n_components, n_dimentions_normal) * 10
+            
+        self.normal_sigmas = np.random.uniform(1, 2, size=(n_components, n_dimentions_normal))
         self.latent_z = np.random.rand(n_samples, self.n_components)
         self.weights = np.random.rand(self.n_components)
         self.weights /= self.weights.sum()
@@ -37,7 +47,7 @@ class BernoulliNormalMixture:
         return pdf.sum()
     
     def log_normal(self, X, means, sigmas):
-        return norm.logpdf(X, means, sigmas).sum()
+        return norm.logpdf(X, means, np.sqrt(sigmas)).sum()
     
     def eStep(self):
         self.latent_z = []
@@ -49,10 +59,8 @@ class BernoulliNormalMixture:
             weights_probs = [] 
             for k in range(self.n_components):
                 a = log_weights[k]
-                #b1 = self.log_bernoulli(X_bernoulli, self.bernoulli_params[k])
-                b1 = 0.0
+                b1 = self.log_bernoulli(X_bernoulli, self.bernoulli_params[k])
                 b2 = self.log_normal(X_normal, self.normal_means[k], self.normal_sigmas[k])
-                #b2 = 0.0
                 weights_probs.append(a + b1 + b2)
             tot_log_likelyhood = logsumexp(weights_probs)
             loglikelyfood += tot_log_likelyhood
@@ -77,13 +85,13 @@ class BernoulliNormalMixture:
             row_norm_means = []
             for d in range(self.bernoulli_params.shape[1]):
                 row_norm_means.append((self.latent_z[:, k] * self.sample_normal[:, d]).sum() / tot_latent_z)
-            new_norm_means.append(row_ber_params)
+            new_norm_means.append(row_norm_means)
             
             row_norm_sigma = []
             for d in range(self.bernoulli_params.shape[1]):
                 row_norm_sigma.append((self.latent_z[:, k] * (self.sample_normal[:, d] - row_norm_means[d]) ** 2).sum() / tot_latent_z)
             #print row_norm_sigma
-            new_norm_sigma.append(row_norm_sigma)    
+            new_norm_sigma.append(np.maximum(row_norm_sigma, 1e-5))
             #sigma = (self.latent_z[:, k] * (self.sample_normal[:, 0] - np.array(row_norm_means)) ** 2).sum(axis = 0) / tot_latent_z
             #print sigma
             #sys.exit(1)
@@ -95,11 +103,11 @@ class BernoulliNormalMixture:
         
 if __name__ == "__main__":
     import matplotlib.pyplot as plt
-    n_sample = 50
+    n_sample = 200
     n_dim = 1
     n_components = 2
-    np.random.seed(1234)
-    weights = np.random.dirichlet([1] * 2)
+    #np.random.seed(12154)
+    weights = np.random.dirichlet([1] * n_components)
     #weights = [0.1, 0.9]
     #ber_params = [[0.1], [0.9]]
     #norm_means = [[20], [-20]]
@@ -118,7 +126,7 @@ if __name__ == "__main__":
     #plt.show()
     sample_bernoulli, sample_normal = np.array(sample_bernoulli), np.array(sample_normal)
     
-    poisson_mixture = BernoulliNormalMixture(n_components, 10)
+    poisson_mixture = BernoulliNormalMixture(n_components, 50)
     latent_z = poisson_mixture.fit(sample_bernoulli, sample_normal)
     print latent_z
     
