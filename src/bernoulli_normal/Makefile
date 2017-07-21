@@ -1,2 +1,3 @@
-#CC=/usr/local/bin/gcc-5
+CFLAGS=`pkg-config --cflags gsl`
+LOADLIBES=`pkg-config --libs gsl`
 bernoulli_normal_mixture:

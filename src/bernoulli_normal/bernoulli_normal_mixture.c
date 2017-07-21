@@ -213,7 +213,7 @@ void bernoulliNormalMixtureFit(BernoulliNormalMixture *bernoulli_mixture, double
 
 	double *normal_sigmas = malloc(sizeof(double) * bernoulli_mixture->n_components * n_normal_dimentions);
 	for (int i=0; i < bernoulli_mixture->n_components * n_normal_dimentions; i++) {
-		normal_sigmas[i] = (double)rand() / RAND_MAX * 2 + 1;
+		normal_sigmas[i] = (double)rand() / RAND_MAX * 2 + 10;
 	}
 
     bernoulli_mixture->sample_normal = sample_normal;
@@ -256,12 +256,66 @@ void bernoulliNormalMixtureFit(BernoulliNormalMixture *bernoulli_mixture, double
 	//free(bernoulli_params);
 }
 
-#define N_SAMPLES 10000
-#define N_DIMENTIONS 100
+#define N_SAMPLES 1000
+#define N_BERNOULLI_DIMENTIONS 100
+#define N_NORMAL_DIMENTIONS 10
+#define N_COMPONENTS 2
+#include <gsl/gsl_rng.h>
+#include <gsl/gsl_randist.h>
+#include <gsl/gsl_blas.h>
+#include <gsl/gsl_vector.h>
+#include <gsl/gsl_matrix.h>
+#include <gsl/gsl_linalg.h>
+
 int main(void) {
-	double sample_bernoulli[] = {0, 0, 1, 0, 1, 1};
-	double sample_normal[] = {100, 200, 50, 100, 20, 20};
+	int i, j;
+	double true_prob[N_COMPONENTS];
+	double dirichlet_alpha[N_COMPONENTS];
+	unsigned int multi_variate[N_COMPONENTS];
+	gsl_rng *rng = gsl_rng_alloc (gsl_rng_default);
+	double *bernoulli_means, *normal_means, *normal_sigmas;
+	bernoulli_means = malloc(sizeof(double) * N_COMPONENTS * N_BERNOULLI_DIMENTIONS);
+	normal_means = malloc(sizeof(double) * N_COMPONENTS * N_NORMAL_DIMENTIONS);
+	normal_sigmas = malloc(sizeof(double) * N_COMPONENTS * N_NORMAL_DIMENTIONS);
+
+	for(j=0; j < N_COMPONENTS; j++) {
+		dirichlet_alpha[j] = 1.0;
+	}
+	gsl_ran_dirichlet(rng, N_COMPONENTS, dirichlet_alpha, true_prob);
+
+	for (i=0;i < N_COMPONENTS; i++) {
+		for(j=0; j < N_BERNOULLI_DIMENTIONS; j++) {
+			bernoulli_means[i * N_BERNOULLI_DIMENTIONS + j] = gsl_rng_uniform(rng);
+		}
+		for(j=0; j < N_NORMAL_DIMENTIONS; j++) {
+			normal_means[i * N_NORMAL_DIMENTIONS + j] = gsl_rng_uniform(rng);
+			normal_sigmas[i * N_NORMAL_DIMENTIONS + j] = gsl_rng_uniform(rng) * 2 + 5;
+		}
+	}
+
+	double *sample_bernoulli, *sample_normal;
+	sample_bernoulli = malloc(sizeof(double) * N_SAMPLES * N_BERNOULLI_DIMENTIONS);
+	sample_normal = malloc(sizeof(double) * N_SAMPLES * N_NORMAL_DIMENTIONS);
+
+	for(i=0; i < N_SAMPLES; i++) {
+		gsl_ran_multinomial(rng, N_COMPONENTS, 1, true_prob, multi_variate);
+		int latent_z;
+		for(j=0; j < N_COMPONENTS; j++) {
+			if(multi_variate[j] == 1) {
+				latent_z = j;
+				break;
+			}
+		}
+		for(j=0; j < N_BERNOULLI_DIMENTIONS; j++) {
+			int success = gsl_ran_bernoulli(rng, bernoulli_means[latent_z * N_BERNOULLI_DIMENTIONS + j]);
+			sample_bernoulli[i * N_BERNOULLI_DIMENTIONS + j] = success;
+		}
+		for(j=0; j < N_NORMAL_DIMENTIONS; j++) {
+			double X = gsl_ran_gaussian(rng, normal_sigmas[latent_z * N_NORMAL_DIMENTIONS + j]) + normal_means[latent_z * N_NORMAL_DIMENTIONS + j];
+			sample_normal[i * N_NORMAL_DIMENTIONS + j] = X;
+		}
+	}
 	BernoulliNormalMixture *bernoulli_normal_mixture = bernoulliNormalMixtureInit(2, 100);
-	bernoulliNormalMixtureFit(bernoulli_normal_mixture, sample_bernoulli, sample_normal, 6, 1, 1, NULL);
+	bernoulliNormalMixtureFit(bernoulli_normal_mixture, sample_bernoulli, sample_normal, N_SAMPLES, N_BERNOULLI_DIMENTIONS, N_NORMAL_DIMENTIONS, NULL);
 }
 
