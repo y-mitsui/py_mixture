@@ -137,6 +137,7 @@ void bernoulliNormalMStep(BernoulliNormalMixture *bernoulli_mixture, int n_sampl
 		for(int d=0; d < n_bernoulli_dimentions; d++) {
 			double tot_mul = 0.0;
 			for (int i=0; i < bernoulli_mixture->n_success_dim[d]; i++){
+				printf("bernoulli_mixture->sample_X1_dim[d][i]:%d\n", bernoulli_mixture->sample_X1_dim[d][i]);
 				tot_mul += latent_z[bernoulli_mixture->sample_X1_dim[d][i] * bernoulli_mixture->n_components + k];
 			}
 			bernoulli_params[k * n_bernoulli_dimentions + d] = tot_mul / tot_latent_zk;
