@@ -19,5 +19,5 @@ typedef struct {
 }BernoulliNormalMixture;
 
 BernoulliNormalMixture *bernoulliNormalMixtureInit(int n_components, int n_iter);
-void bernoulliNormalMixtureFit(BernoulliNormalMixture *bernoulli_mixture, double *sample_bernoulli, double *sample_normal, int n_samples, int n_bernoulli_dimentions, int n_normal_dimentions);
+void bernoulliNormalMixtureFit(BernoulliNormalMixture *bernoulli_mixture, double *sample_bernoulli, double *sample_normal, int n_samples, int n_bernoulli_dimentions, int n_normal_dimentions, double *normal_means_init);
 
