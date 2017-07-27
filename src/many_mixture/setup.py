@@ -5,11 +5,11 @@ import os
 #os.environ["CC"] = "gcc-5"
 #os.environ["CXX"] = "g++"
 
-ext1 = Extension("bernoulli_normal_mixture_wrap",
+ext1 = Extension("many_mixture_wrap",
                  extra_compile_args=["-g"],
-                sources=["bernoulli_normal_mixture_wrap.pyx", "bernoulli_normal_mixture.c"],
+                sources=["many_mixture_wrap.pyx", "many_mixture.c"],
                 )
                 
-setup(name = 'bernoulli_normal_mixture', ext_modules = cythonize([ext1]))
+setup(name = 'many_mixture', ext_modules = cythonize([ext1]))
 
 

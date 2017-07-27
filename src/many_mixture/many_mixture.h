@@ -1,3 +1,14 @@
+typedef struct {
+	int n_cache;
+	double *cache;
+}LogFactorial;
+
+typedef struct {
+	LogFactorial *log_factorial;
+	int n_cache;
+	int n_dimentions;
+	double *cache;
+}LogPoisson;
 
 typedef struct {
 	int n_components;
@@ -19,6 +30,10 @@ typedef struct {
 	int *n_success;
 	int **sample_X1_dim;
 	int *n_success_dim;
+	LogPoisson **log_poisson;
+	int **poisson_index_dim;
+	int **poisson_conter_dim;
+	int *n_word_type_dim;
 }ManyMixture;
 
 ManyMixture *manyMixtureInit(int n_components, int n_iter);

@@ -3,23 +3,23 @@ import numpy as np
 from sklearn.cluster import KMeans
 import sys
 
-cdef extern from "bernoulli_normal_mixture.h":
-    BernoulliNormalMixture *bernoulliNormalMixtureInit(int n_components, int n_iter)
-    void bernoulliNormalMixtureFit(BernoulliNormalMixture *bernoulli_mixture, double *sample_bernoulli, double *sample_normal, int n_samples, int n_bernoulli_dimentions, int n_normal_dimentions, double *normal_means_init)
-    ctypedef struct BernoulliNormalMixture:
+cdef extern from "many_mixture.h":
+    ManyMixture *manyMixtureInit(int n_components, int n_iter)
+    void manyMixtureFit(ManyMixture *bernoulli_mixture, double *sample_poisson, double *sample_bernoulli, double *sample_normal, int n_samples, int n_poisson_dimentions, int n_bernoulli_dimentions, int n_normal_dimentions, double *normal_means_init)
+    ctypedef struct ManyMixture:
         int n_components
         int n_bernoulli_dimentions
         double *latent_z
         double *bernoulli_params
         double *weights
     
-cdef class BernoulliNormalMixtureWrap:
-    cdef BernoulliNormalMixture *bernoulli_mixture
+cdef class ManyMixtureWrap:
+    cdef ManyMixture *bernoulli_mixture
     cdef object init_kmeans
     cdef object n_components
     
     def __init__(self, n_components=2, n_iter=100, init_kmeans=False):
-        self.bernoulli_mixture = bernoulliNormalMixtureInit(n_components, n_iter)
+        self.bernoulli_mixture = manyMixtureInit(n_components, n_iter)
         self.init_kmeans = init_kmeans
         self.n_components = n_components
         
@@ -32,8 +32,19 @@ cdef class BernoulliNormalMixtureWrap:
             r.append(row)
         return r
         
-    def fit_transform(self, sample_bernoulli=None, sample_normal=None, normal_mean_init=None):
+    def fit_transform(self, sample_poisson=None, sample_bernoulli=None, sample_normal=None, normal_mean_init=None):
         cdef int n_samples = 0
+        cdef double *c_sample_poisson = NULL
+        cdef int n_poisson_dimentions = 0
+        
+        if sample_poisson is not None:
+            n_samples = sample_poisson.shape[0]
+            n_poisson_dimentions = sample_poisson.shape[1]
+            c_sample_poisson = <double*>malloc(sizeof(double) * n_samples * n_poisson_dimentions)
+            for i in range(n_samples):
+                for j in range(n_poisson_dimentions):
+                    c_sample_poisson[i * n_poisson_dimentions + j] = sample_poisson[i, j]
+         
         cdef double *c_sample_bernoulli = NULL
         cdef int n_bernoulli_dimentions = 0
         
@@ -67,7 +78,7 @@ cdef class BernoulliNormalMixtureWrap:
         if n_samples == 0:
             raise Exception("must be number of samples > 0")
                 
-        bernoulliNormalMixtureFit(self.bernoulli_mixture, c_sample_bernoulli, c_sample_normal, n_samples, n_bernoulli_dimentions, n_normal_dimentions, normal_means_init)
+        manyMixtureFit(self.bernoulli_mixture, c_sample_poisson, c_sample_bernoulli, c_sample_normal, n_samples, n_poisson_dimentions, n_bernoulli_dimentions, n_normal_dimentions, normal_means_init)
         result = []
         for i in range(n_samples):
             row = []
@@ -77,8 +88,8 @@ cdef class BernoulliNormalMixtureWrap:
         free(c_sample_bernoulli)
         return result
     
-    def fit_predict(self, sample_bernoulli=None, sample_normal=None):
-        result = self.fit_transform(sample_bernoulli, sample_normal)
+    def fit_predict(self, sample_poisson=None, sample_bernoulli=None, sample_normal=None):
+        result = self.fit_transform(sample_poisson, sample_bernoulli, sample_normal)
         return np.argmax(result, 1)
     
         
