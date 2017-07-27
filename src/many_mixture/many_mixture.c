@@ -337,29 +337,27 @@ void manyMixtureFit(ManyMixture *bernoulli_mixture, double *sample_poisson, doub
     int *poisson_index = malloc(sizeof(int) * max_value);
     for (int j=0; j < n_poisson_dimentions; j++) {
     	int n_types = 0;
+    	memset(poisson_index, -1, sizeof(int) * max_value);
 		for (int i=0; i < n_samples; i++) {
-			int k=0;
-			for (; k < n_types; k++) {
-				if (poisson_index[j] ==	(int)sample_poisson[i * n_poisson_dimentions + j]) break;
-			}
-			if (k == n_types) poisson_index[n_types++] = sample_poisson[i * n_poisson_dimentions + j];
-			n_word_type_dim[j] = n_types;
+			int val = (int)sample_poisson[i * n_poisson_dimentions + j];
+			if (poisson_index[val] == -1) poisson_index[val] = n_types++;
 		}
+		n_word_type_dim[j] = n_types;
     }
     puts("P0.2");
     int **poisson_index_dim = malloc(sizeof(int*) * n_poisson_dimentions);
     int **poisson_conter_dim = malloc(sizeof(int*) * n_poisson_dimentions);
     for (int j=0; j < n_poisson_dimentions; j++) {
     	int n_types = 0;
+    	memset(poisson_index, -1, sizeof(int) * max_value);
+    	poisson_index_dim[j] = malloc(sizeof(int) * n_word_type_dim[j]);
+		poisson_conter_dim[j] = calloc(1, sizeof(int) * n_word_type_dim[j]);
+
     	for (int i=0; i < n_samples; i++) {
-    		poisson_index_dim[j] = malloc(sizeof(int) * n_word_type_dim[j]);
-    		poisson_conter_dim[j] = malloc(sizeof(int) * n_word_type_dim[j]);
-    		int k=0;
-    		for (; k < n_word_type_dim[j]; k++) {
-    			if (poisson_index_dim[j][k] ==	sample_poisson[i * n_poisson_dimentions + j]) break;
-    		}
-    		if (k == n_types) poisson_index_dim[j][n_types++] = sample_poisson[i * n_poisson_dimentions + j];
-    		poisson_conter_dim[j][poisson_index[k]]++;
+    		int val = (int)sample_poisson[i * n_poisson_dimentions + j];
+    		if (poisson_index[val] == -1) poisson_index[val] = n_types++;
+    		poisson_index_dim[j][poisson_index[val]] = val;
+    		poisson_conter_dim[j][poisson_index[val]]++;
     	}
     }
     bernoulli_mixture->poisson_index_dim = poisson_index_dim;
@@ -400,7 +398,7 @@ void manyMixtureFit(ManyMixture *bernoulli_mixture, double *sample_poisson, doub
 
 #define N_SAMPLES 10000
 #define N_BERNOULLI_DIMENTIONS 10
-#define N_POISSON_DIMENTIONS 5000
+#define N_POISSON_DIMENTIONS 50000
 #define N_NORMAL_DIMENTIONS 10
 #define N_COMPONENTS 2
 #include <gsl/gsl_rng.h>
