@@ -4,6 +4,15 @@
 #include <string.h>
 #include "bernoulli_normal_mixture.h"
 
+void *dmalloc(size_t size) {
+    void *ptr = malloc(size);
+    if (ptr == NULL) {
+        fprintf(stderr, "out of memory (%dB)", size);
+        exit(1);
+    }
+    return ptr;
+}
+
 double logsumexp(double *nums, size_t ct) {
   double max_exp = nums[0], sum = 0.0;
   size_t i;
@@ -30,7 +39,7 @@ double xor128(){
 }
 
 BernoulliNormalMixture *bernoulliNormalMixtureInit(int n_components, int n_iter) {
-	BernoulliNormalMixture *bernoulli_normal_mixture = malloc(sizeof(BernoulliNormalMixture));
+	BernoulliNormalMixture *bernoulli_normal_mixture = dmalloc(sizeof(BernoulliNormalMixture));
 	bernoulli_normal_mixture->n_components = n_components;
 	bernoulli_normal_mixture->n_iter = n_iter;
 	return bernoulli_normal_mixture;
@@ -79,22 +88,19 @@ void bernoulliNormalEStep(BernoulliNormalMixture *bernoulli_mixture, int n_sampl
 	int n_normal_dimentions = bernoulli_mixture->n_normal_dimentions;
 	double *bernoulli_params = bernoulli_mixture->bernoulli_params;
 
-	puts("p0.1");
-	double *log_weights = malloc(sizeof(double) * bernoulli_mixture->n_components);
+	double *log_weights = dmalloc(sizeof(double) * bernoulli_mixture->n_components);
 	for(int i=0; i < bernoulli_mixture->n_components ; i++) {
 		log_weights[i] = log(max(weights[i], 1e-10));
 	}
-	puts("p0.2");
-	double *log_bernoulli_params1 = malloc(sizeof(double) * n_bernoulli_dimentions * bernoulli_mixture->n_components);
+	double *log_bernoulli_params1 = dmalloc(sizeof(double) * n_bernoulli_dimentions * bernoulli_mixture->n_components);
 	for(int i=0; i < n_bernoulli_dimentions * bernoulli_mixture->n_components ; i++) {
 		log_bernoulli_params1[i] = log(min(max(bernoulli_params[i], 1e-10), 1 - 1e-10));
 	}
-	double *log_bernoulli_params0 = malloc(sizeof(double) * n_bernoulli_dimentions * bernoulli_mixture->n_components);
+	double *log_bernoulli_params0 = dmalloc(sizeof(double) * n_bernoulli_dimentions * bernoulli_mixture->n_components);
 	for(int i=0; i < n_bernoulli_dimentions * bernoulli_mixture->n_components ; i++) {
 		log_bernoulli_params0[i] = log(min(max(1 - bernoulli_params[i], 1e-10), 1 - 1e-10));
 	}
-	puts("p0.3");
-	double *weight_probs = malloc(sizeof(double) * bernoulli_mixture->n_components);
+	double *weight_probs = dmalloc(sizeof(double) * bernoulli_mixture->n_components);
 	double loglikelyfood = 0.0;
 	for(int i=0; i < n_samples ; i++) {
 		for(int j=0; j < bernoulli_mixture->n_components; j++) {
@@ -115,7 +121,6 @@ void bernoulliNormalEStep(BernoulliNormalMixture *bernoulli_mixture, int n_sampl
 			latent_z[i * bernoulli_mixture->n_components + j] = exp(weight_probs[j] - tot_log_likelyhood);
 		}
 	}
-	puts("p0.6");
 	printf("loglikelyfood:%f\n", loglikelyfood);
 	free(log_bernoulli_params0);
 	free(log_bernoulli_params1);
@@ -129,7 +134,6 @@ void bernoulliNormalMStep(BernoulliNormalMixture *bernoulli_mixture, int n_sampl
 	double *bernoulli_params = bernoulli_mixture->bernoulli_params;
 
 	for(int k=0; k < bernoulli_mixture->n_components; k++) {
-		puts("p1.0");
 		double tot_latent_zk = 0.0;
 		for (int i=0; i < n_samples; i++)
 			tot_latent_zk += latent_z[i * bernoulli_mixture->n_components + k];
@@ -137,26 +141,23 @@ void bernoulliNormalMStep(BernoulliNormalMixture *bernoulli_mixture, int n_sampl
 		for(int d=0; d < n_bernoulli_dimentions; d++) {
 			double tot_mul = 0.0;
 			for (int i=0; i < bernoulli_mixture->n_success_dim[d]; i++){
-				printf("bernoulli_mixture->sample_X1_dim[d][i]:%d\n", bernoulli_mixture->sample_X1_dim[d][i]);
 				tot_mul += latent_z[bernoulli_mixture->sample_X1_dim[d][i] * bernoulli_mixture->n_components + k];
 			}
 			bernoulli_params[k * n_bernoulli_dimentions + d] = tot_mul / tot_latent_zk;
 		}
 
-		puts("p1.1");
 		for(int d=0; d < n_normal_dimentions; d++) {
 			double tot_mul = 0.0;
 			for (int i=0; i < n_samples; i++){
 				tot_mul += bernoulli_mixture->sample_normal[i * n_normal_dimentions + d] * latent_z[i * bernoulli_mixture->n_components + k];
 			}
-			bernoulli_mixture->normal_means[k * n_bernoulli_dimentions + d] = tot_mul / tot_latent_zk;
+			bernoulli_mixture->normal_means[k * n_normal_dimentions + d] = tot_mul / tot_latent_zk;
 		}
 
-		puts("p1.2");
 		for(int d=0; d < n_normal_dimentions; d++) {
 			double tot_mul = 0.0;
 			for (int i=0; i < n_samples; i++){
-				double diff = bernoulli_mixture->sample_normal[i * n_normal_dimentions + d] - bernoulli_mixture->normal_means[k * n_bernoulli_dimentions + d];
+				double diff = bernoulli_mixture->sample_normal[i * n_normal_dimentions + d] - bernoulli_mixture->normal_means[k * n_normal_dimentions + d];
 				double mse = diff * diff;
 				tot_mul += mse * latent_z[i * bernoulli_mixture->n_components + k];
 			}
@@ -167,12 +168,12 @@ void bernoulliNormalMStep(BernoulliNormalMixture *bernoulli_mixture, int n_sampl
 }
 
 void bernoulliNormalMixtureFit(BernoulliNormalMixture *bernoulli_mixture, double *sample_bernoulli, double *sample_normal, int n_samples, int n_bernoulli_dimentions, int n_normal_dimentions, double *normal_means_init) {
-	double *bernoulli_params = malloc(sizeof(double) * bernoulli_mixture->n_components * n_bernoulli_dimentions);
+	double *bernoulli_params = dmalloc(sizeof(double) * bernoulli_mixture->n_components * n_bernoulli_dimentions);
 	for (int i=0; i < bernoulli_mixture->n_components * n_bernoulli_dimentions; i++) {
 		bernoulli_params[i] = (double)rand() / RAND_MAX;
 	}
-	double *latent_z = malloc(sizeof(double) * n_samples * bernoulli_mixture->n_components);
-	double *weights = malloc(sizeof(double) * bernoulli_mixture->n_components);
+	double *latent_z = dmalloc(sizeof(double) * n_samples * bernoulli_mixture->n_components);
+	double *weights = dmalloc(sizeof(double) * bernoulli_mixture->n_components);
 	double tot_weights = 0.0;
 	for (int i=0; i < bernoulli_mixture->n_components; i++) {
 		weights[i] = (double)rand() / RAND_MAX;
@@ -181,11 +182,11 @@ void bernoulliNormalMixtureFit(BernoulliNormalMixture *bernoulli_mixture, double
 	for (int i=0; i < bernoulli_mixture->n_components; i++)
 		weights[i] /= tot_weights;
 
-    bernoulli_mixture->sample_X0 = malloc(sizeof(int*) * n_samples);
-    bernoulli_mixture->sample_X1 = malloc(sizeof(int*) * n_samples);
-    bernoulli_mixture->n_success = malloc(sizeof(int) * n_samples);
-    int *tmp0 = malloc(sizeof(int) * n_bernoulli_dimentions);
-    int *tmp1 = malloc(sizeof(int) * n_bernoulli_dimentions);
+    bernoulli_mixture->sample_X0 = dmalloc(sizeof(int*) * n_samples);
+    bernoulli_mixture->sample_X1 = dmalloc(sizeof(int*) * n_samples);
+    bernoulli_mixture->n_success = dmalloc(sizeof(int) * n_samples);
+    int *tmp0 = dmalloc(sizeof(int) * n_bernoulli_dimentions);
+    int *tmp1 = dmalloc(sizeof(int) * n_bernoulli_dimentions);
     for (int i=0; i < n_samples; i++) {
         int n_success_row = 0;
         int n_fail_row = 0;
@@ -197,13 +198,13 @@ void bernoulliNormalMixtureFit(BernoulliNormalMixture *bernoulli_mixture, double
             }
         }
         bernoulli_mixture->n_success[i] = n_success_row;
-        bernoulli_mixture->sample_X0[i] = malloc(sizeof(int) * n_fail_row);
-        bernoulli_mixture->sample_X1[i] = malloc(sizeof(int) * n_success_row);
+        bernoulli_mixture->sample_X0[i] = dmalloc(sizeof(int) * n_fail_row);
+        bernoulli_mixture->sample_X1[i] = dmalloc(sizeof(int) * n_success_row);
         memcpy(bernoulli_mixture->sample_X0[i], tmp0, sizeof(int) * n_fail_row);
         memcpy(bernoulli_mixture->sample_X1[i], tmp1, sizeof(int) * n_success_row);
     }
 
-    double *normal_means = malloc(sizeof(double) * bernoulli_mixture->n_components * n_normal_dimentions);
+    double *normal_means = dmalloc(sizeof(double) * bernoulli_mixture->n_components * n_normal_dimentions);
     if(normal_means_init == NULL) {
     	for (int i=0; i < bernoulli_mixture->n_components * n_normal_dimentions; i++) {
 			normal_means[i] = (double)rand() / RAND_MAX;
@@ -212,7 +213,7 @@ void bernoulliNormalMixtureFit(BernoulliNormalMixture *bernoulli_mixture, double
     	memcpy(normal_means, normal_means_init, sizeof(double) * bernoulli_mixture->n_components * n_normal_dimentions);
     }
 
-	double *normal_sigmas = malloc(sizeof(double) * bernoulli_mixture->n_components * n_normal_dimentions);
+	double *normal_sigmas = dmalloc(sizeof(double) * bernoulli_mixture->n_components * n_normal_dimentions);
 	for (int i=0; i < bernoulli_mixture->n_components * n_normal_dimentions; i++) {
 		normal_sigmas[i] = (double)rand() / RAND_MAX * 2 + 10;
 	}
@@ -223,9 +224,9 @@ void bernoulliNormalMixtureFit(BernoulliNormalMixture *bernoulli_mixture, double
     bernoulli_mixture->bernoulli_params = bernoulli_params;
     bernoulli_mixture->n_bernoulli_dimentions = n_bernoulli_dimentions;
     bernoulli_mixture->n_normal_dimentions = n_normal_dimentions;
-    bernoulli_mixture->sample_X1_dim = malloc(sizeof(int*) * n_bernoulli_dimentions);
-    bernoulli_mixture->n_success_dim = malloc(sizeof(int) * n_bernoulli_dimentions);
-    int *tmp1_dim = malloc(sizeof(int) * n_samples);
+    bernoulli_mixture->sample_X1_dim = dmalloc(sizeof(int*) * n_bernoulli_dimentions);
+    bernoulli_mixture->n_success_dim = dmalloc(sizeof(int) * n_bernoulli_dimentions);
+    int *tmp1_dim = dmalloc(sizeof(int) * n_samples);
     for (int j=0; j < n_bernoulli_dimentions; j++) {
         int n_success_row = 0;
         for (int i=0; i < n_samples; i++) {
@@ -234,15 +235,12 @@ void bernoulliNormalMixtureFit(BernoulliNormalMixture *bernoulli_mixture, double
             }
         }
         bernoulli_mixture->n_success_dim[j] = n_success_row;
-        bernoulli_mixture->sample_X1_dim[j] = malloc(sizeof(int) * n_success_row);
+        bernoulli_mixture->sample_X1_dim[j] = dmalloc(sizeof(int) * n_success_row);
         memcpy(bernoulli_mixture->sample_X1_dim[j], tmp1_dim, sizeof(int) * n_success_row);
     }
 	for(int iter=0; iter < bernoulli_mixture->n_iter; iter++) {
-		puts("p0");
 		bernoulliNormalEStep(bernoulli_mixture, n_samples, weights, latent_z);
-		puts("p1");
 		bernoulliNormalMStep(bernoulli_mixture, n_samples, weights, latent_z);
-		puts("p2");
 		if (iter % (bernoulli_mixture->n_iter / 100 + 1) == 0) {
 			printf("%d / %d\n", iter, bernoulli_mixture->n_iter);
 		}
@@ -257,10 +255,10 @@ void bernoulliNormalMixtureFit(BernoulliNormalMixture *bernoulli_mixture, double
 	//free(bernoulli_params);
 }
 
-#define N_SAMPLES 1000
-#define N_BERNOULLI_DIMENTIONS 100
+#define N_SAMPLES 100000
+#define N_BERNOULLI_DIMENTIONS 5000
 #define N_NORMAL_DIMENTIONS 10
-#define N_COMPONENTS 2
+#define N_COMPONENTS 100
 #include <gsl/gsl_rng.h>
 #include <gsl/gsl_randist.h>
 #include <gsl/gsl_blas.h>
@@ -275,9 +273,9 @@ int main(void) {
 	unsigned int multi_variate[N_COMPONENTS];
 	gsl_rng *rng = gsl_rng_alloc (gsl_rng_default);
 	double *bernoulli_means, *normal_means, *normal_sigmas;
-	bernoulli_means = malloc(sizeof(double) * N_COMPONENTS * N_BERNOULLI_DIMENTIONS);
-	normal_means = malloc(sizeof(double) * N_COMPONENTS * N_NORMAL_DIMENTIONS);
-	normal_sigmas = malloc(sizeof(double) * N_COMPONENTS * N_NORMAL_DIMENTIONS);
+	bernoulli_means = dmalloc(sizeof(double) * N_COMPONENTS * N_BERNOULLI_DIMENTIONS);
+	normal_means = dmalloc(sizeof(double) * N_COMPONENTS * N_NORMAL_DIMENTIONS);
+	normal_sigmas = dmalloc(sizeof(double) * N_COMPONENTS * N_NORMAL_DIMENTIONS);
 
 	for(j=0; j < N_COMPONENTS; j++) {
 		dirichlet_alpha[j] = 1.0;
@@ -295,13 +293,13 @@ int main(void) {
 	}
 
 	double *sample_bernoulli, *sample_normal;
-	sample_bernoulli = malloc(sizeof(double) * N_SAMPLES * N_BERNOULLI_DIMENTIONS);
-	sample_normal = malloc(sizeof(double) * N_SAMPLES * N_NORMAL_DIMENTIONS);
+	sample_bernoulli = dmalloc(sizeof(double) * N_SAMPLES * N_BERNOULLI_DIMENTIONS);
+	sample_normal = dmalloc(sizeof(double) * N_SAMPLES * N_NORMAL_DIMENTIONS);
 
 	for(i=0; i < N_SAMPLES; i++) {
 		gsl_ran_multinomial(rng, N_COMPONENTS, 1, true_prob, multi_variate);
-		int latent_z;
-		for(j=0; j < N_COMPONENTS; j++) {
+		int latent_z = 0;
+		for(j=1; j < N_COMPONENTS; j++) {
 			if(multi_variate[j] == 1) {
 				latent_z = j;
 				break;
@@ -316,6 +314,7 @@ int main(void) {
 			sample_normal[i * N_NORMAL_DIMENTIONS + j] = X;
 		}
 	}
+	
 	BernoulliNormalMixture *bernoulli_normal_mixture = bernoulliNormalMixtureInit(2, 100);
 	bernoulliNormalMixtureFit(bernoulli_normal_mixture, sample_bernoulli, sample_normal, N_SAMPLES, N_BERNOULLI_DIMENTIONS, N_NORMAL_DIMENTIONS, NULL);
 }
