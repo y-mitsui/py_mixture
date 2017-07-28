@@ -254,9 +254,9 @@ void bernoulliNormalMixtureFit(BernoulliNormalMixture *bernoulli_mixture, double
 	free(tmp1);
 	//free(bernoulli_params);
 }
-
-#define N_SAMPLES 100000
-#define N_BERNOULLI_DIMENTIONS 5000
+/*
+#define N_SAMPLES 1000
+#define N_BERNOULLI_DIMENTIONS 100
 #define N_NORMAL_DIMENTIONS 10
 #define N_COMPONENTS 100
 #include <gsl/gsl_rng.h>
@@ -317,5 +317,5 @@ int main(void) {
 	
 	BernoulliNormalMixture *bernoulli_normal_mixture = bernoulliNormalMixtureInit(2, 100);
 	bernoulliNormalMixtureFit(bernoulli_normal_mixture, sample_bernoulli, sample_normal, N_SAMPLES, N_BERNOULLI_DIMENTIONS, N_NORMAL_DIMENTIONS, NULL);
-}
+}*/
 
