@@ -31,9 +31,10 @@ typedef struct {
 	int **sample_X1_dim;
 	int *n_success_dim;
 	LogPoisson **log_poisson;
-	int **poisson_index_dim;
-	int **poisson_conter_dim;
-	int *n_word_type_dim;
+	int **poisson_indexes_dim;
+	int **poisson_counters_dim;
+	int *n_positive;
+	
 }ManyMixture;
 
 ManyMixture *manyMixtureInit(int n_components, int n_iter);
