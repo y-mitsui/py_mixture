@@ -190,8 +190,8 @@ void bernoulliNormalEStep(ManyMixture *bernoulli_mixture, int n_samples, double 
 	for(int i=0; i < n_samples ; i++) {
 		for(int j=0; j < bernoulli_mixture->n_components; j++) {
 			//double poisson_prob = logPoisson(&bernoulli_mixture->sample_poisson[i * n_poisson_dimentions], n_poisson_dimentions, &bernoulli_mixture->poisson_means[j * n_poisson_dimentions]);
-			//double poisson_prob = logPoissonPdf(bernoulli_mixture->log_poisson[j], &bernoulli_mixture->sample_poisson[i * n_poisson_dimentions], n_poisson_dimentions, &bernoulli_mixture->poisson_means[j * n_poisson_dimentions]);
-			double poisson_prob = logPoissonPdf2(bernoulli_mixture->log_poisson[j], bernoulli_mixture->poisson_indexes[i], bernoulli_mixture->poisson_counts[i], bernoulli_mixture->poisson_zeros[i], bernoulli_mixture->poisson_n_positive[i], n_poisson_dimentions, &bernoulli_mixture->poisson_means[j * n_poisson_dimentions]);
+			double poisson_prob = logPoissonPdf(bernoulli_mixture->log_poisson[j], &bernoulli_mixture->sample_poisson[i * n_poisson_dimentions], n_poisson_dimentions, &bernoulli_mixture->poisson_means[j * n_poisson_dimentions]);
+			//double poisson_prob = logPoissonPdf2(bernoulli_mixture->log_poisson[j], bernoulli_mixture->poisson_indexes[i], bernoulli_mixture->poisson_counts[i], bernoulli_mixture->poisson_zeros[i], bernoulli_mixture->poisson_n_positive[i], n_poisson_dimentions, &bernoulli_mixture->poisson_means[j * n_poisson_dimentions]);
 			double bernoulli_prob = logBernoulli2(bernoulli_mixture->sample_X0[i],
 			                                      bernoulli_mixture->sample_X1[i],
 			                                      bernoulli_mixture->n_success[i],
@@ -201,6 +201,7 @@ void bernoulliNormalEStep(ManyMixture *bernoulli_mixture, int n_samples, double 
 			double normal_prob = logNormal(&bernoulli_mixture->sample_normal[i * n_normal_dimentions], n_normal_dimentions, &bernoulli_mixture->normal_means[j * n_normal_dimentions], &bernoulli_mixture->normal_sigmas[j * n_normal_dimentions]);
 			weight_probs[j] = (log_weights[j] + bernoulli_prob + normal_prob + poisson_prob);
 		}
+
 		double tot_log_likelyhood = logsumexp(weight_probs, bernoulli_mixture->n_components);
 		loglikelyfood += tot_log_likelyhood;
 		for(int j=0; j < bernoulli_mixture->n_components; j++) {
@@ -285,7 +286,7 @@ void bernoulliNormalMStep(ManyMixture *bernoulli_mixture, int n_samples, double 
 	}
 }
 
-void manyMixtureFit(ManyMixture *bernoulli_mixture, int **poisson_indexes, int **poisson_counts, int *poission_n_positive, double *sample_bernoulli, double *sample_normal, int n_samples, int n_poisson_dimentions, int n_bernoulli_dimentions, int n_normal_dimentions, double *normal_means_init) {
+void manyMixtureFit(ManyMixture *bernoulli_mixture, double *sample_poisson, int **poisson_indexes, int **poisson_counts, int *poission_n_positive, double *sample_bernoulli, double *sample_normal, int n_samples, int n_poisson_dimentions, int n_bernoulli_dimentions, int n_normal_dimentions, double *normal_means_init) {
 	double *poisson_means = malloc(sizeof(double) * bernoulli_mixture->n_components * n_poisson_dimentions);
 	for (int i=0; i < bernoulli_mixture->n_components * n_poisson_dimentions; i++) {
 		poisson_means[i] = (double)rand() / RAND_MAX * 2;
@@ -346,6 +347,7 @@ void manyMixtureFit(ManyMixture *bernoulli_mixture, int **poisson_indexes, int *
 		normal_sigmas[i] = (double)rand() / RAND_MAX * 2 + 10;
 	}
 
+	bernoulli_mixture->sample_poisson = sample_poisson;
 	bernoulli_mixture->poisson_indexes = poisson_indexes;
 	bernoulli_mixture->poisson_counts = poisson_counts;
 	bernoulli_mixture->poisson_n_positive = poission_n_positive;
@@ -367,12 +369,13 @@ void manyMixtureFit(ManyMixture *bernoulli_mixture, int **poisson_indexes, int *
     bernoulli_mixture->poisson_zeros = malloc(sizeof(int*) * n_samples);
 	for(int i=0; i < n_samples; i++) {
 		bernoulli_mixture->poisson_zeros[i] = malloc(sizeof(int) * poission_n_positive[i]);
+		int n_zeros = 0;
 		for(int j=0; j < n_poisson_dimentions; j++) {
 			int k=0;
 			for(; k  < poission_n_positive[i]; k++)
 				if (poisson_indexes[i][k] == j) break;
 			if(k == poission_n_positive[i])
-				bernoulli_mixture->poisson_zeros[i][j] = j;
+				bernoulli_mixture->poisson_zeros[i][n_zeros++] = j;
 		}
 	}
 
