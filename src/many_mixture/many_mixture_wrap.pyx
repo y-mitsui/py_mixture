@@ -32,7 +32,7 @@ cdef class ManyMixtureWrap:
             r.append(row)
         return r
         
-    def fit_transform(self, poisson_indexes=None, poisson_counts=None, sample_bernoulli=None, sample_normal=None, normal_mean_init=None):
+    def fit_transform(self, poisson_indexes=None, poisson_counts=None, sample_poisson=None, sample_bernoulli=None, sample_normal=None, normal_mean_init=None):
         cdef int n_samples = 0
         cdef int n_poisson_dimentions = 0
         cdef int i, j, n_col
