@@ -20,7 +20,9 @@ typedef struct {
 	double *bernoulli_params;
 	double *normal_means;
 	double *normal_sigmas;
-	double *sample_poisson;
+	int **poisson_indexes;
+	int **poisson_counts;
+	int **poisson_zeros;
 	double *sample_bernoulli;
 	double *sample_normal;
 	double *latent_z;
@@ -33,10 +35,11 @@ typedef struct {
 	LogPoisson **log_poisson;
 	int **poisson_indexes_dim;
 	int **poisson_counters_dim;
-	int *n_positive;
+	int *poisson_n_positive;
+	int *poisson_n_positive_dim;
 	
 }ManyMixture;
 
 ManyMixture *manyMixtureInit(int n_components, int n_iter);
-void manyMixtureFit(ManyMixture *bernoulli_mixture, double *sample_poisson, double *sample_bernoulli, double *sample_normal, int n_samples, int n_poisson_dimentions, int n_bernoulli_dimentions, int n_normal_dimentions, double *normal_means_init);
+void manyMixtureFit(ManyMixture *bernoulli_mixture, int **poisson_indexes, int **poisson_counts, int *poission_n_poistive, double *sample_bernoulli, double *sample_normal, int n_samples, int n_poisson_dimentions, int n_bernoulli_dimentions, int n_normal_dimentions, double *normal_means_init);
 
