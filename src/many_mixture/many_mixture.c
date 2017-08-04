@@ -192,7 +192,6 @@ void bernoulliNormalEStep(ManyMixture *bernoulli_mixture, int n_samples, double 
 			//double poisson_prob = logPoisson(&bernoulli_mixture->sample_poisson[i * n_poisson_dimentions], n_poisson_dimentions, &bernoulli_mixture->poisson_means[j * n_poisson_dimentions]);
 			//double poisson_prob0 = logPoissonPdf(bernoulli_mixture->log_poisson[j], &bernoulli_mixture->sample_poisson[i * n_poisson_dimentions], n_poisson_dimentions, &bernoulli_mixture->poisson_means[j * n_poisson_dimentions]);
 			double poisson_prob = logPoissonPdf2(bernoulli_mixture->log_poisson[j], bernoulli_mixture->poisson_indexes[i], bernoulli_mixture->poisson_counts[i], bernoulli_mixture->poisson_zeros[i], bernoulli_mixture->poisson_n_positive[i], n_poisson_dimentions, &bernoulli_mixture->poisson_means[j * n_poisson_dimentions]);
-			//if (poisson_prob0 != poisson_prob){printf("error %f:%f\n", poisson_prob0, poisson_prob); exit(1); }
 			double bernoulli_prob = logBernoulli2(bernoulli_mixture->sample_X0[i],
 			                                      bernoulli_mixture->sample_X1[i],
 			                                      bernoulli_mixture->n_success[i],
@@ -308,7 +307,7 @@ List *listAdd(List *list, int index, int count) {
 	return list->next;
 }
 
-void manyMixtureFit(ManyMixture *bernoulli_mixture, double *sample_poisson, int **poisson_indexes, int **poisson_counts, int *poission_n_positive, double *sample_bernoulli, double *sample_normal, int n_samples, int n_poisson_dimentions, int n_bernoulli_dimentions, int n_normal_dimentions, double *normal_means_init) {
+void manyMixtureFit(ManyMixture *bernoulli_mixture, double *sample_poisson, int **poisson_indexes, int **poisson_counts, int *poisson_n_positive, double *sample_bernoulli, double *sample_normal, int n_samples, int n_poisson_dimentions, int n_bernoulli_dimentions, int n_normal_dimentions, double *normal_means_init) {
 	double *poisson_means = malloc(sizeof(double) * bernoulli_mixture->n_components * n_poisson_dimentions);
 	for (int i=0; i < bernoulli_mixture->n_components * n_poisson_dimentions; i++) {
 		poisson_means[i] = (double)rand() / RAND_MAX * 2;
@@ -372,7 +371,7 @@ void manyMixtureFit(ManyMixture *bernoulli_mixture, double *sample_poisson, int 
 	bernoulli_mixture->sample_poisson = sample_poisson;
 	bernoulli_mixture->poisson_indexes = poisson_indexes;
 	bernoulli_mixture->poisson_counts = poisson_counts;
-	bernoulli_mixture->poisson_n_positive = poission_n_positive;
+	bernoulli_mixture->poisson_n_positive = poisson_n_positive;
     bernoulli_mixture->sample_normal = sample_normal;
     bernoulli_mixture->normal_means = normal_means;
     bernoulli_mixture->normal_sigmas = normal_sigmas;
@@ -383,7 +382,6 @@ void manyMixtureFit(ManyMixture *bernoulli_mixture, double *sample_poisson, int 
     bernoulli_mixture->n_normal_dimentions = n_normal_dimentions;
 
     time_t t0 = time(NULL);
-    puts("a");
     bernoulli_mixture->poisson_zeros = malloc(sizeof(int*) * n_samples);
     int *sample_row = malloc(sizeof(int) * n_poisson_dimentions);
     //int **poisson_indexes_dim = malloc(sizeof(int*) * n_poisson_dimentions);
@@ -394,23 +392,22 @@ void manyMixtureFit(ManyMixture *bernoulli_mixture, double *sample_poisson, int 
     }
     int *n_positive = calloc(1, sizeof(int) * n_poisson_dimentions);
 	for(int i=0; i < n_samples; i++) {
-		bernoulli_mixture->poisson_zeros[i] = malloc(sizeof(int) * poission_n_positive[i]);
+		bernoulli_mixture->poisson_zeros[i] = malloc(sizeof(int) * (n_poisson_dimentions - poisson_n_positive[i]));
 		int n_zeros = 0;
 		memset(sample_row, 0, sizeof(int) * n_poisson_dimentions);
-		for(int j=0; j < poission_n_positive[i]; j++) {
+		for(int j=0; j < poisson_n_positive[i]; j++) {
 			sample_row[poisson_indexes[i][j]] = poisson_counts[i][j];
 		}
 		for(int j=0; j < n_poisson_dimentions; j++) {
 			if (sample_row[j] != 0) {
-				bernoulli_mixture->poisson_zeros[i][n_zeros++] = j;
 				poission_indexes_dim_cur[j] = listAdd(poission_indexes_dim_cur[j], i, sample_row[j]);
 				n_positive[j]++;
+			}else {
+			    bernoulli_mixture->poisson_zeros[i][n_zeros++] = j;
 			}
 		}
 	}
 	free(sample_row);
-
-	puts("a1");
 	printf("%d\n", time(NULL) - t0);
 	int **poisson_indexes_dim = malloc(sizeof(int*) * n_poisson_dimentions);
 	int **poisson_counters_dim = malloc(sizeof(int*) * n_poisson_dimentions);
@@ -429,7 +426,6 @@ void manyMixtureFit(ManyMixture *bernoulli_mixture, double *sample_poisson, int 
 		//memcpy(poisson_counters_dim[j], positive_sample_counter, sizeof(int) * n_positive[j]);
     }
     printf("%d\n", time(NULL) - t0);
-    puts("b");
     bernoulli_mixture->poisson_indexes_dim = poisson_indexes_dim;
     bernoulli_mixture->poisson_counters_dim = poisson_counters_dim;
     bernoulli_mixture->poisson_n_positive_dim = n_positive;
@@ -506,7 +502,7 @@ void manyMixtureFit(ManyMixture *bernoulli_mixture, double *sample_poisson, int 
 
 #define N_SAMPLES 35000
 #define N_BERNOULLI_DIMENTIONS 1
-#define N_POISSON_DIMENTIONS 10000
+#define N_POISSON_DIMENTIONS 35000
 #define N_NORMAL_DIMENTIONS 1
 #define N_COMPONENTS 2
 #include <gsl/gsl_rng.h>
@@ -538,7 +534,7 @@ int main(void) {
 			bernoulli_means[i * N_BERNOULLI_DIMENTIONS + j] = gsl_rng_uniform(rng);
 		}
 		for(j=0; j < N_POISSON_DIMENTIONS; j++) {
-			poisson_means[i * N_POISSON_DIMENTIONS + j] = gsl_rng_uniform(rng) * 1;
+			poisson_means[i * N_POISSON_DIMENTIONS + j] = gsl_rng_uniform(rng) * 0.1;
 		}
 		for(j=0; j < N_NORMAL_DIMENTIONS; j++) {
 			normal_means[i * N_NORMAL_DIMENTIONS + j] = gsl_rng_uniform(rng);
@@ -575,9 +571,11 @@ int main(void) {
 		for(j=0; j < N_POISSON_DIMENTIONS; j++) {
 			int x = gsl_ran_poisson(rng, poisson_means[latent_z * N_POISSON_DIMENTIONS + j]);
 			//sample_poisson[i * N_POISSON_DIMENTIONS + j] = (double)x;
-			indexes_row[n_positive_row] = j;
-			counts_row[n_positive_row] = x;
-			n_positive_row++;
+			if (x > 0) {
+    			indexes_row[n_positive_row] = j;
+	    		counts_row[n_positive_row] = x;
+	    		n_positive_row++;
+    		}
 		}
 		n_positives[i] = n_positive_row;
 		poisson_indexes[i] = malloc(sizeof(int) * n_positive_row);
