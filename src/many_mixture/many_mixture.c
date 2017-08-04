@@ -190,7 +190,7 @@ void bernoulliNormalEStep(ManyMixture *bernoulli_mixture, int n_samples, double 
 	for(int i=0; i < n_samples ; i++) {
 		for(int j=0; j < bernoulli_mixture->n_components; j++) {
 			//double poisson_prob = logPoisson(&bernoulli_mixture->sample_poisson[i * n_poisson_dimentions], n_poisson_dimentions, &bernoulli_mixture->poisson_means[j * n_poisson_dimentions]);
-			double poisson_prob0 = logPoissonPdf(bernoulli_mixture->log_poisson[j], &bernoulli_mixture->sample_poisson[i * n_poisson_dimentions], n_poisson_dimentions, &bernoulli_mixture->poisson_means[j * n_poisson_dimentions]);
+			//double poisson_prob0 = logPoissonPdf(bernoulli_mixture->log_poisson[j], &bernoulli_mixture->sample_poisson[i * n_poisson_dimentions], n_poisson_dimentions, &bernoulli_mixture->poisson_means[j * n_poisson_dimentions]);
 			double poisson_prob = logPoissonPdf2(bernoulli_mixture->log_poisson[j], bernoulli_mixture->poisson_indexes[i], bernoulli_mixture->poisson_counts[i], bernoulli_mixture->poisson_zeros[i], bernoulli_mixture->poisson_n_positive[i], n_poisson_dimentions, &bernoulli_mixture->poisson_means[j * n_poisson_dimentions]);
 			//if (poisson_prob0 != poisson_prob){printf("error %f:%f\n", poisson_prob0, poisson_prob); exit(1); }
 			double bernoulli_prob = logBernoulli2(bernoulli_mixture->sample_X0[i],
@@ -506,7 +506,7 @@ void manyMixtureFit(ManyMixture *bernoulli_mixture, double *sample_poisson, int 
 
 #define N_SAMPLES 35000
 #define N_BERNOULLI_DIMENTIONS 1
-#define N_POISSON_DIMENTIONS 50000
+#define N_POISSON_DIMENTIONS 10000
 #define N_NORMAL_DIMENTIONS 1
 #define N_COMPONENTS 2
 #include <gsl/gsl_rng.h>
@@ -547,7 +547,7 @@ int main(void) {
 	}
 
 	double *sample_poisson, *sample_bernoulli, *sample_normal;
-	sample_poisson = malloc(sizeof(double) * N_SAMPLES * N_POISSON_DIMENTIONS);
+	//sample_poisson = malloc(sizeof(double) * N_SAMPLES * N_POISSON_DIMENTIONS);
 	sample_bernoulli = malloc(sizeof(double) * N_SAMPLES * N_BERNOULLI_DIMENTIONS);
 	sample_normal = malloc(sizeof(double) * N_SAMPLES * N_NORMAL_DIMENTIONS);
 	int **poisson_indexes, **poisson_counts;
@@ -574,7 +574,7 @@ int main(void) {
 		int n_positive_row = 0;
 		for(j=0; j < N_POISSON_DIMENTIONS; j++) {
 			int x = gsl_ran_poisson(rng, poisson_means[latent_z * N_POISSON_DIMENTIONS + j]);
-			sample_poisson[i * N_POISSON_DIMENTIONS + j] = (double)x;
+			//sample_poisson[i * N_POISSON_DIMENTIONS + j] = (double)x;
 			indexes_row[n_positive_row] = j;
 			counts_row[n_positive_row] = x;
 			n_positive_row++;
