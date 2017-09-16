@@ -39,8 +39,12 @@ typedef struct {
 	int *poisson_n_positive;
 	int *poisson_n_positive_dim;
 	
+	int **sample_categorical;
+	int n_categorical_dimentions;
+	double **categorical_params;
+	int *n_categorical_params;
+	
 }ManyMixture;
 
 ManyMixture *manyMixtureInit(int n_components, int n_iter);
-void manyMixtureFit(ManyMixture *bernoulli_mixture, double *sample_poisson, int **poisson_indexes, int **poisson_counts, int *poisson_n_positive, double *sample_bernoulli, double *sample_normal, int n_samples, int n_poisson_dimentions, int n_bernoulli_dimentions, int n_normal_dimentions, double *normal_means_init);
-
+void manyMixtureFit(ManyMixture *bernoulli_mixture, double *sample_poisson, int **poisson_indexes, int **poisson_counts, int *poisson_n_positive, double *sample_bernoulli, int **sample_categorical, double *sample_normal, int n_samples, int n_poisson_dimentions, int n_categorical_dimentions, int *n_categorical_params, int n_bernoulli_dimentions, int n_normal_dimentions, double *normal_means_init);

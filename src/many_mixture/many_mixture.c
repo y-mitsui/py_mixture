@@ -57,6 +57,17 @@ double logBernoulli2(int *sample_X0, int *sample_X1, int n_success, int n_diment
 	return log_prob;
 }
 
+double logCategorical(int **sample_X, int n_dimentions, double **params, int *n_params) {
+    double coef = log(1 / sqrt(2 * M_PI));
+	double pdf = 0.0;
+	for(int i=0; i < n_dimentions; i++) {
+	    for(int j=0; j < n_params[i]; j++) {
+	        pdf += params[i][j] * sample_X[i][j];
+	    }
+	}
+	return pdf;
+}
+
 double logNormal(double *sample_X, int n_dimentions, double *means, double *sigmas) {
 	double coef = log(1 / sqrt(2 * M_PI));
 	double pdf = 0.0;
@@ -166,6 +177,7 @@ double max(double x, double y) {
 void bernoulliNormalEStep(ManyMixture *bernoulli_mixture, int n_samples, double *weights, double *latent_z) {
 	int n_poisson_dimentions = bernoulli_mixture->n_poisson_dimentions;
 	int n_bernoulli_dimentions = bernoulli_mixture->n_bernoulli_dimentions;
+	int n_categorical_dimentions = bernoulli_mixture->n_categorical_dimentions;
 	int n_normal_dimentions = bernoulli_mixture->n_normal_dimentions;
 	double *bernoulli_params = bernoulli_mixture->bernoulli_params;
 
@@ -202,8 +214,13 @@ void bernoulliNormalEStep(ManyMixture *bernoulli_mixture, int n_samples, double 
 			                                      n_bernoulli_dimentions,
 			                                      &log_bernoulli_params0[j * n_bernoulli_dimentions],
 			                                      &log_bernoulli_params1[j * n_bernoulli_dimentions]);
+			                                      
+            double categorical_prob = logCategorical(&bernoulli_mixture->sample_categorical[i * n_categorical_dimentions],
+			                                      n_categorical_dimentions,
+			                                      &bernoulli_mixture->categorical_params[j * n_categorical_dimentions],
+			                                      bernoulli_mixture->n_categorical_params);
 			double normal_prob = logNormal(&bernoulli_mixture->sample_normal[i * n_normal_dimentions], n_normal_dimentions, &bernoulli_mixture->normal_means[j * n_normal_dimentions], &bernoulli_mixture->normal_sigmas[j * n_normal_dimentions]);
-			weight_probs[j] = (log_weights[j] + bernoulli_prob + normal_prob + poisson_prob);
+			weight_probs[j] = (log_weights[j] + bernoulli_prob + normal_prob + poisson_prob + categorical_prob);
 		}
 
 
@@ -224,8 +241,10 @@ void bernoulliNormalMStep(ManyMixture *bernoulli_mixture, int n_samples, double 
 	int n_poisson_dimentions = bernoulli_mixture->n_poisson_dimentions;
 	int n_bernoulli_dimentions = bernoulli_mixture->n_bernoulli_dimentions;
 	int n_normal_dimentions = bernoulli_mixture->n_normal_dimentions;
+	int n_categorical_dimentions = bernoulli_mixture->n_categorical_dimentions;
 	double *poisson_means = bernoulli_mixture->poisson_means;
 	double *bernoulli_params = bernoulli_mixture->bernoulli_params;
+	double **categorical_params = bernoulli_mixture->categorical_params;
 
 	for(int k=0; k < bernoulli_mixture->n_components; k++) {
 		double tot_latent_zk = 0.0;
@@ -269,6 +288,16 @@ void bernoulliNormalMStep(ManyMixture *bernoulli_mixture, int n_samples, double 
 			}
 			bernoulli_params[k * n_bernoulli_dimentions + d] = tot_mul / tot_latent_zk;
 		}
+		
+		for(int d=0; d < n_categorical_dimentions; d++) {
+			for (int i=0; i < bernoulli_mixture->n_categorical_params[d]; i++){
+			    double tot_mul = 0.0;
+			    for(int n=0; n < n_samples; n++) {
+			        tot_mul += bernoulli_mixture->sample_categorical[n * n_categorical_dimentions + d][i] * latent_z[n * bernoulli_mixture->n_components + k];
+			    }
+			    categorical_params[k * n_categorical_dimentions + d][i] = tot_mul / tot_latent_zk;
+			}
+		}
 
 		for(int d=0; d < n_normal_dimentions; d++) {
 			double tot_mul = 0.0;
@@ -311,8 +340,7 @@ List *listAdd(List *list, int index, int count) {
 	return list->next;
 }
 
-void manyMixtureFit(ManyMixture *bernoulli_mixture, double *sample_poisson, int **poisson_indexes, int **poisson_counts, int *poisson_n_positive, double *sample_bernoulli, double *sample_normal, int n_samples, int n_poisson_dimentions, int n_bernoulli_dimentions, int n_normal_dimentions, double *normal_means_init) {
-	puts("b");
+void manyMixtureFit(ManyMixture *bernoulli_mixture, double *sample_poisson, int **poisson_indexes, int **poisson_counts, int *poisson_n_positive, double *sample_bernoulli, int **sample_categorical, double *sample_normal, int n_samples, int n_poisson_dimentions, int n_categorical_dimentions, int *n_categorical_params, int n_bernoulli_dimentions, int n_normal_dimentions, double *normal_means_init) {
 	double *poisson_means = malloc(sizeof(double) * bernoulli_mixture->n_components * n_poisson_dimentions);
 	for (int i=0; i < bernoulli_mixture->n_components * n_poisson_dimentions; i++) {
 		poisson_means[i] = (double)rand() / RAND_MAX * 2;
@@ -358,7 +386,7 @@ void manyMixtureFit(ManyMixture *bernoulli_mixture, double *sample_poisson, int 
         memcpy(bernoulli_mixture->sample_X0[i], tmp0, sizeof(int) * n_fail_row);
         memcpy(bernoulli_mixture->sample_X1[i], tmp1, sizeof(int) * n_success_row);
     }
-
+    
     double *normal_means = malloc(sizeof(double) * bernoulli_mixture->n_components * n_normal_dimentions);
     if(normal_means_init == NULL) {
     	for (int i=0; i < bernoulli_mixture->n_components * n_normal_dimentions; i++) {
@@ -372,7 +400,19 @@ void manyMixtureFit(ManyMixture *bernoulli_mixture, double *sample_poisson, int 
 	for (int i=0; i < bernoulli_mixture->n_components * n_normal_dimentions; i++) {
 		normal_sigmas[i] = (double)rand() / RAND_MAX * 2 + 10;
 	}
-
+	
+	double **categorical_params = malloc(sizeof(double*) * bernoulli_mixture->n_components * n_categorical_dimentions);
+	for(int i=0; i < bernoulli_mixture->n_components; i++) {
+	    for(int j=0; j < n_categorical_dimentions; j++) {
+    	    categorical_params[i * n_categorical_dimentions + j] = malloc(sizeof(double) * n_categorical_params[i]);
+	    }
+	}
+	
+    bernoulli_mixture->sample_categorical = sample_categorical;
+    bernoulli_mixture->n_categorical_dimentions = n_categorical_dimentions;
+    bernoulli_mixture->n_categorical_params = n_categorical_params;
+    bernoulli_mixture->categorical_params = categorical_params;
+    
 	bernoulli_mixture->sample_poisson = sample_poisson;
 	bernoulli_mixture->poisson_indexes = poisson_indexes;
 	bernoulli_mixture->poisson_counts = poisson_counts;
@@ -597,7 +637,7 @@ int main(void) {
 		}
 	}
 	ManyMixture *bernoulli_normal_mixture = manyMixtureInit(2, 100);
-	manyMixtureFit(bernoulli_normal_mixture, sample_poisson, poisson_indexes, poisson_counts, n_positives, sample_bernoulli, sample_normal, N_SAMPLES, N_POISSON_DIMENTIONS, N_BERNOULLI_DIMENTIONS, N_NORMAL_DIMENTIONS, NULL);
+	//manyMixtureFit(bernoulli_normal_mixture, sample_poisson, poisson_indexes, poisson_counts, n_positives, sample_bernoulli, sample_normal, N_SAMPLES, N_POISSON_DIMENTIONS, N_BERNOULLI_DIMENTIONS, N_NORMAL_DIMENTIONS, NULL);
 
 }
 

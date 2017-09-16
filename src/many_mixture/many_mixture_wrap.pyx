@@ -5,7 +5,7 @@ import sys
 
 cdef extern from "many_mixture.h":
     ManyMixture *manyMixtureInit(int n_components, int n_iter)
-    void manyMixtureFit(ManyMixture *bernoulli_mixture, double *sample_poisson, int **poisson_indexes, int **poisson_counts, int *poisson_n_positive, double *sample_bernoulli, double *sample_normal, int n_samples, int n_poisson_dimentions, int n_bernoulli_dimentions, int n_normal_dimentions, double *normal_means_init)
+    void manyMixtureFit(ManyMixture *bernoulli_mixture, double *sample_poisson, int **poisson_indexes, int **poisson_counts, int *poisson_n_positive, double *sample_bernoulli, int **sample_categorical, double *sample_normal, int n_samples, int n_poisson_dimentions, int n_categorical_dimentions, int *n_categorical_params, int n_bernoulli_dimentions, int n_normal_dimentions, double *normal_means_init)
     ctypedef struct ManyMixture:
         int n_components
         int n_bernoulli_dimentions
@@ -32,7 +32,7 @@ cdef class ManyMixtureWrap:
             r.append(row)
         return r
         
-    def fit_transform(self, poisson_indexes=None, poisson_counts=None, sample_bernoulli=None, sample_normal=None, normal_mean_init=None):
+    def fit_transform(self, poisson_indexes=None, poisson_counts=None, sample_bernoulli=None, sample_categorical=None, sample_normal=None, normal_mean_init=None):
         cdef int n_samples = 0
         cdef int n_poisson_dimentions = 0
         cdef int i, j, n_col
@@ -58,7 +58,6 @@ cdef class ManyMixtureWrap:
         
         cdef double *c_sample_bernoulli = NULL
         cdef int n_bernoulli_dimentions = 0
-        
         if sample_bernoulli is not None:
             n_samples = sample_bernoulli.shape[0]
             n_bernoulli_dimentions = sample_bernoulli.shape[1]
@@ -66,6 +65,22 @@ cdef class ManyMixtureWrap:
             for i in range(n_samples):
                 for j in range(n_bernoulli_dimentions):
                     c_sample_bernoulli[i * n_bernoulli_dimentions + j] = sample_bernoulli[i, j]
+                    
+        cdef int **c_sample_categorical = NULL
+        cdef int n_categorical_dimentions = 0
+        if sample_categorical is not None:
+            n_samples = sample_categorical.shape[0]
+            n_categorical_dimentions = sample_categorical.shape[1]
+            c_sample_categorical = <int**>malloc(sizeof(int*) * n_samples * n_categorical_dimentions)
+            n_categorical_params = <int*>malloc(sizeof(int) * n_categorical_dimentions)
+            for i in range(n_bernoulli_dimentions):
+                n_categorical_params[j] = len(sample_categorical[0][i])
+                
+            for i in range(n_samples):
+                for j in range(n_categorical_dimentions):
+                    c_sample_categorical[i * n_categorical_dimentions + j] = <int*>malloc(sizeof(int) * n_categorical_params[j])
+                    for k in range(n_categorical_params[j]):
+                        c_sample_categorical[i * n_categorical_dimentions + j][k] = sample_categorical[i][j][k]
                 
         cdef int n_normal_dimentions = 0
         cdef double *c_sample_normal = NULL
@@ -89,7 +104,7 @@ cdef class ManyMixtureWrap:
         if n_samples == 0:
             raise Exception("must be number of samples > 0")
                 
-        manyMixtureFit(self.bernoulli_mixture, NULL, c_poisson_indexes, c_poisson_counts, n_positive, c_sample_bernoulli, c_sample_normal, n_samples, n_poisson_dimentions, n_bernoulli_dimentions, n_normal_dimentions, normal_means_init)
+        manyMixtureFit(self.bernoulli_mixture, NULL, c_poisson_indexes, c_poisson_counts, n_positive, c_sample_bernoulli, c_sample_categorical, c_sample_normal, n_samples, n_poisson_dimentions, n_categorical_dimentions, n_categorical_params,  n_bernoulli_dimentions, n_normal_dimentions, normal_means_init)
         result = []
         for i in range(n_samples):
             row = []
