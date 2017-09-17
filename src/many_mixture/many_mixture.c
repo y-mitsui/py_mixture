@@ -5,6 +5,14 @@
 #include <string.h>
 #include "many_mixture.h"
 
+double min(double x, double y) {
+	return (x < y) ? x : y;
+}
+
+double max(double x, double y) {
+	return (x > y) ? x : y;
+}
+
 double logsumexp(double *nums, size_t ct) {
   double max_exp = nums[0], sum = 0.0;
   size_t i;
@@ -58,11 +66,10 @@ double logBernoulli2(int *sample_X0, int *sample_X1, int n_success, int n_diment
 }
 
 double logCategorical(int **sample_X, int n_dimentions, double **params, int *n_params) {
-    double coef = log(1 / sqrt(2 * M_PI));
 	double pdf = 0.0;
 	for(int i=0; i < n_dimentions; i++) {
 	    for(int j=0; j < n_params[i]; j++) {
-	        pdf += params[i][j] * sample_X[i][j];
+	        pdf += log(min(max(params[i][j], 1e-10), 1 - 1e-10)) * sample_X[i][j];
 	    }
 	}
 	return pdf;
@@ -166,13 +173,6 @@ double logPoisson(double *sample_X, int n_dimentions, double *means) {
 	return pdf;
 }
 
-double min(double x, double y) {
-	return (x < y) ? x : y;
-}
-
-double max(double x, double y) {
-	return (x > y) ? x : y;
-}
 
 void bernoulliNormalEStep(ManyMixture *bernoulli_mixture, int n_samples, double *weights, double *latent_z) {
 	int n_poisson_dimentions = bernoulli_mixture->n_poisson_dimentions;
@@ -220,6 +220,7 @@ void bernoulliNormalEStep(ManyMixture *bernoulli_mixture, int n_samples, double 
 			                                      &bernoulli_mixture->categorical_params[j * n_categorical_dimentions],
 			                                      bernoulli_mixture->n_categorical_params);
 			double normal_prob = logNormal(&bernoulli_mixture->sample_normal[i * n_normal_dimentions], n_normal_dimentions, &bernoulli_mixture->normal_means[j * n_normal_dimentions], &bernoulli_mixture->normal_sigmas[j * n_normal_dimentions]);
+		    //printf("0:%f 1:%f 2:%f 3:%f\n", bernoulli_prob , normal_prob , poisson_prob , categorical_prob);
 			weight_probs[j] = (log_weights[j] + bernoulli_prob + normal_prob + poisson_prob + categorical_prob);
 		}
 
@@ -228,9 +229,12 @@ void bernoulliNormalEStep(ManyMixture *bernoulli_mixture, int n_samples, double 
 		loglikelyfood += tot_log_likelyhood;
 		for(int j=0; j < bernoulli_mixture->n_components; j++) {
 			latent_z[i * bernoulli_mixture->n_components + j] = exp(weight_probs[j] - tot_log_likelyhood);
+			/*if (latent_z[i * bernoulli_mixture->n_components + j] < 1e-5) latent_z[i * bernoulli_mixture->n_components + j] = 1e-5;
+		    if (latent_z[i * bernoulli_mixture->n_components + j] > (1 - 1e-5)) latent_z[i * bernoulli_mixture->n_components + j] = (1 - 1e-5);*/
 		}
 	}
 	printf("loglikelyfood:%f\n", loglikelyfood);
+	//exit(1);
 	free(log_bernoulli_params0);
 	free(log_bernoulli_params1);
 	free(log_weights);
@@ -246,6 +250,9 @@ void bernoulliNormalMStep(ManyMixture *bernoulli_mixture, int n_samples, double 
 	double *bernoulli_params = bernoulli_mixture->bernoulli_params;
 	double **categorical_params = bernoulli_mixture->categorical_params;
 
+    printf("latent_z[i * bernoulli_mixture->n_components + k]:%f\n", latent_z[0 * bernoulli_mixture->n_components + 0]);
+    printf("latent_z[i * bernoulli_mixture->n_components + k]:%f\n", latent_z[0 * bernoulli_mixture->n_components + 1]);
+    
 	for(int k=0; k < bernoulli_mixture->n_components; k++) {
 		double tot_latent_zk = 0.0;
 		for (int i=0; i < n_samples; i++)
@@ -292,13 +299,31 @@ void bernoulliNormalMStep(ManyMixture *bernoulli_mixture, int n_samples, double 
 		for(int d=0; d < n_categorical_dimentions; d++) {
 			for (int i=0; i < bernoulli_mixture->n_categorical_params[d]; i++){
 			    double tot_mul = 0.0;
+			    int tmp = 0;
+			    double tmp2 = 0.0;
 			    for(int n=0; n < n_samples; n++) {
-			        tot_mul += bernoulli_mixture->sample_categorical[n * n_categorical_dimentions + d][i] * latent_z[n * bernoulli_mixture->n_components + k];
+			        tot_mul += (double)bernoulli_mixture->sample_categorical[n * n_categorical_dimentions + d][i] * latent_z[n * bernoulli_mixture->n_components + k];
+			        
+			        tmp += bernoulli_mixture->sample_categorical[n * n_categorical_dimentions + d][i];
+			        tmp2 += latent_z[n * bernoulli_mixture->n_components + k];
+			        //printf("a:%f b:%f c:%f\n", (double)bernoulli_mixture->sample_categorical[n * n_categorical_dimentions + d][i] * latent_z[n * bernoulli_mixture->n_components + k], (double)bernoulli_mixture->sample_categorical[n * n_categorical_dimentions + d][i], latent_z[n * bernoulli_mixture->n_components + k]);
 			    }
+			    //printf("tot_mul:%f %f tmp:%d m tmp2:%f\n", tot_mul, tot_latent_zk, tmp, tmp2 / n_samples);
+			    //if (tot_mul < 1) exit(1);
 			    categorical_params[k * n_categorical_dimentions + d][i] = tot_mul / tot_latent_zk;
+			    /*if (categorical_params[k * n_categorical_dimentions + d][i] < 1e-5) categorical_params[k * n_categorical_dimentions + d][i] = 1e-5;
+			    if (categorical_params[k * n_categorical_dimentions + d][i] > (1 - 1e-5)) categorical_params[k * n_categorical_dimentions + d][i] = (1 - 1e-5);*/
 			}
 		}
-
+		
+		for(int d=0; d < n_categorical_dimentions; d++) {
+			for (int i=0; i < bernoulli_mixture->n_categorical_params[d]; i++){
+			    printf("%f ", categorical_params[k * n_categorical_dimentions + d][i]);
+		    }
+		    puts("");
+	    }
+	    puts("");
+        //exit(1);
 		for(int d=0; d < n_normal_dimentions; d++) {
 			double tot_mul = 0.0;
 			for (int i=0; i < n_samples; i++){
@@ -405,6 +430,14 @@ void manyMixtureFit(ManyMixture *bernoulli_mixture, double *sample_poisson, int 
 	for(int i=0; i < bernoulli_mixture->n_components; i++) {
 	    for(int j=0; j < n_categorical_dimentions; j++) {
     	    categorical_params[i * n_categorical_dimentions + j] = malloc(sizeof(double) * n_categorical_params[i]);
+    	    double tot = 0.0;
+    	    for(int k=0; k < n_categorical_params[i]; k++) {
+    	        categorical_params[i * n_categorical_dimentions + j][k] = (double)rand() / RAND_MAX * 2;
+    	        tot += categorical_params[i * n_categorical_dimentions + j][k];
+    	    }
+    	    for(int k=0; k < n_categorical_params[i]; k++) {
+    	        categorical_params[i * n_categorical_dimentions + j][k] /= tot;
+    	    }
 	    }
 	}
 	

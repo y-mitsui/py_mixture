@@ -9,10 +9,13 @@ cdef extern from "many_mixture.h":
     ctypedef struct ManyMixture:
         int n_components
         int n_bernoulli_dimentions
+        int n_categorical_dimentions
         double *latent_z
         double *bernoulli_params
+        double **categorical_params
         double *weights
-    
+        int *n_categorical_params
+        
 cdef class ManyMixtureWrap:
     cdef ManyMixture *bernoulli_mixture
     cdef object init_kmeans
@@ -32,6 +35,18 @@ cdef class ManyMixtureWrap:
             r.append(row)
         return r
         
+    def getCategoricalParams(self):
+        r = []
+        for i in range(self.bernoulli_mixture.n_components):
+            row = []
+            for j in range(self.bernoulli_mixture.n_categorical_dimentions):
+                cal = []
+                for k in range(self.bernoulli_mixture.n_categorical_params[j]):
+                    cal.append(self.bernoulli_mixture.categorical_params[i * self.bernoulli_mixture.n_categorical_dimentions + j][k])
+                row.append(cal)
+            r.append(row)
+        return r
+    
     def fit_transform(self, poisson_indexes=None, poisson_counts=None, sample_bernoulli=None, sample_categorical=None, sample_normal=None, normal_mean_init=None):
         cdef int n_samples = 0
         cdef int n_poisson_dimentions = 0
@@ -68,20 +83,23 @@ cdef class ManyMixtureWrap:
                     
         cdef int **c_sample_categorical = NULL
         cdef int n_categorical_dimentions = 0
+        cdef int *n_categorical_params
+        
         if sample_categorical is not None:
             n_samples = sample_categorical.shape[0]
             n_categorical_dimentions = sample_categorical.shape[1]
             c_sample_categorical = <int**>malloc(sizeof(int*) * n_samples * n_categorical_dimentions)
             n_categorical_params = <int*>malloc(sizeof(int) * n_categorical_dimentions)
-            for i in range(n_bernoulli_dimentions):
-                n_categorical_params[j] = len(sample_categorical[0][i])
+            for i in range(n_categorical_dimentions):
+                n_categorical_params[i] = len(sample_categorical[0][i])
+                print "n_categorical_params[i]", n_categorical_params[i]
                 
             for i in range(n_samples):
                 for j in range(n_categorical_dimentions):
                     c_sample_categorical[i * n_categorical_dimentions + j] = <int*>malloc(sizeof(int) * n_categorical_params[j])
                     for k in range(n_categorical_params[j]):
                         c_sample_categorical[i * n_categorical_dimentions + j][k] = sample_categorical[i][j][k]
-                
+
         cdef int n_normal_dimentions = 0
         cdef double *c_sample_normal = NULL
         cdef double *normal_means_init = NULL
